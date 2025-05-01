@@ -1,0 +1,10 @@
+🪵	Wood	A natural and sustainable material used for framing, flooring, roofs, and decorative elements. It is valued for its aesthetic appeal and versatility.
+🧱	Concrete	A composite material made from cement, sand, aggregate (gravel), and water. It is widely used in foundations, load-bearing structures, and sidewalks due to its high compressive strength.
+🔩	Steel	An alloy of iron and carbon, used for structural frameworks, reinforcement in concrete, and various construction components. It is known for its high strength-to-weight ratio and durability.
+🪟	Glass	A transparent or translucent material used in windows, facades, and roofs. It is valued for its optical properties and ability to refract, reflect, and transmit light.
+🏠	Plaster	A material applied as a decorative or protective coating on interior walls and ceilings. It is easy to work with and can be molded and finished to achieve various textures.
+🪨	Stone	A natural material used in facades, interior walls, floors, and countertops. It is valued for its durability, hardness, and aesthetic appeal.
+🛠️	Aluminum	A lightweight and durable metal used for window frames, exterior panels, and facades. It is corrosion-resistant and has good thermal conductivity.
+🧵	Fabric	A flexible material consisting of a interwoven pattern of natural or artificial fibers. These are commonly used to meet requirements in areas such as structural strength, fire resistance and weather proofing.
+🌿	Bamboo	Bamboo is a family of plants that is perceived as wood but is technically a grass. Bamboo is viewed as a sustainable material due to its high rate of growth with some species growing up to 1.5 inches an hour.
+🛢️	Plastic	Plastic is a category of synthetic material derived from petrochemicals or renewable biomass sources. It is an inexpensive material that is formulated and shaped into a very large number of construction products.
