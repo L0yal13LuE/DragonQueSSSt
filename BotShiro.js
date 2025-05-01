@@ -7,6 +7,10 @@ const { Client, GatewayIntentBits, Collection, EmbedBuilder } = require('discord
 // @supabase/supabase-js: The official JavaScript client for interacting with Supabase services.
 const { createClient } = require('@supabase/supabase-js');
 
+// --- Command Handlers ---
+const { handleSpinCommand } = require('./managers/spinManager.js'); // Import the spin command handler
+
+
 // dotenv: A module to load environment variables from a .env file into process.env.
 // This is crucial for keeping sensitive information (like tokens and keys) out of your code.
 require('dotenv').config();
@@ -1100,6 +1104,7 @@ client.on('messageCreate', async (message) => {
         else if (command === 'chat') handleChatCommand(message, args);
         else if (command === 'bag') handleBagCommand(message);
         else if (command === 'monster') handleMonsterCommand(message);
+        else if (command === 'spin') handleSpinCommand(message, supabase); // Pass supabase to the imported handler
         // Add other commands here
     }
     // Non-Command Message Processing
