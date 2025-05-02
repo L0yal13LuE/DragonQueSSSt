@@ -8,6 +8,7 @@ const { Client, GatewayIntentBits, Collection, EmbedBuilder } = require('discord
 const { createClient } = require('@supabase/supabase-js');
 
 const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js'); // Load the specific command
+const { disAllowChannelArray } = require('./disAllowChannelArray.js');
 
 // dotenv: A module to load environment variables from a .env file into process.env.
 // This is crucial for keeping sensitive information (like tokens and keys) out of your code.
@@ -691,7 +692,7 @@ const handleExpGain = async (message) => {
     const username = message.author.username;
     const currentMessageTimestamp = message.createdTimestamp;
 
-    if (message.author.bot || !supabase) return;
+    if (message.author.bot || !supabase || disAllowChannelArray(message.channel.id)) return;
 
     try {
         let userData = await getUser(userId);
