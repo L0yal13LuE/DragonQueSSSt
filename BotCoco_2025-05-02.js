@@ -7,7 +7,7 @@ const { Client, GatewayIntentBits, Collection, EmbedBuilder } = require('discord
 // @supabase/supabase-js: The official JavaScript client for interacting with Supabase services.
 const { createClient } = require('@supabase/supabase-js');
 
-const leaderboardCommand = require('./command/leaderboard.js'); // Load the specific command
+const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js'); // Load the specific command
 
 // dotenv: A module to load environment variables from a .env file into process.env.
 // This is crucial for keeping sensitive information (like tokens and keys) out of your code.
@@ -1103,8 +1103,8 @@ client.on('messageCreate', async (message) => {
         const command = args.shift().toLowerCase();
 
         // !leaderboard
-        if (leaderboardCommand && command === leaderboardCommand.name) {
-            await leaderboardCommand.execute(message, supabase, client);
+        if (command === 'leaderboard') {
+            await handleLeaderboardCommand(message, supabase, client);
             return;
         }
 
