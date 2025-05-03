@@ -16,28 +16,40 @@ const RARE_MATERIAL_LIST = [
     { emoji: '💎', name: 'Diamond' }, { emoji: '👑', name: 'Crown' }, { emoji: '🔮', name: 'Magic Orb' },
 ];
 
-// --- Monster Definitions (Thai Names) ---
+// --- Monster Definitions (English Names with Gaming Vibe) ---
 const POSSIBLE_MONSTERS = [
-    { name: "ก็อบลินหน้าบูด", baseHp: 1000 }, // Grumpy Goblin
-    { name: "สไลม์ยักษ์", baseHp: 1000 },     // Giant Slime
-    { name: "นักรบโครงกระดูก", baseHp: 1000 },// Skeletal Warrior
-    { name: "ภูตพงไพร", baseHp: 1000 },     // Forest Sprite
-    { name: "โกเลมหินผา", baseHp: 1000 },   // Rock Golem
+    // common
+    { name: "Grumpy Goblin", baseHp: 2000 },
+    { name: "Giant Slime", baseHp: 2000 },
+    { name: "Skeletal Warrior", baseHp: 2000 },
+    { name: "Forest Sprite", baseHp: 2000 },
+    { name: "Rock Golem", baseHp: 2000 },
+    // uncommon
+    { name: "Shadow Stalker", baseHp: 2500 },
+    { name: "Ice Elemental", baseHp: 2200 },
+    { name: "Fire Drake", baseHp: 2300 },
+    { name: "Venomous Serpent", baseHp: 2100 },
+    { name: "Mystic Phoenix", baseHp: 3000 },
+    { name: "Dark Knight", baseHp: 2700 },
+    { name: "Storm Giant", baseHp: 2600 },
+    { name: "Lava Beast", baseHp: 2400 },
+    { name: "Crystal Golem", baseHp: 2800 },
+    { name: "Ethereal Wraith", baseHp: 2900 },
 ];
 
 // --- Cat Language Replies ---
 const catReplies = [
-    "เหมียว?", // Meow?
-    "เมี้ยววว...", // Meeeow...
-    "*เอียงคอ* เหมี๊ยว?", // *tilts head* Mrrr?
-    "พรืดดดด... ฟี้...", // Purrrr... Zzzz...
-    "*คลอเคลีย* เหมียว!", // *nuzzles* Meow!
-    "เหมียววววววววว...", // Puuuurrrrrrrrrrr...
-    "เมี้ยว เมี้ยว!", // Meow meow!
-    "*กะพริบตาช้าๆ*", // *blinks slowly*
-    "หง่าววว?", // Mrow?
-    "ว่าไงทาส เหมียว?", // What is it, human? Meow?
-    "เรียกหาเหมียวเหรอ?", // Calling for meow?
+    "Meow?",
+    "Meeeow...",
+    "*tilts head* Mrrr?",
+    "Purrrr... Zzzz...",
+    "*nuzzles* Meow!",
+    "Puuuuurrrrrrrrrrr...",
+    "Meow meow!",
+    "*blinks slowly*",
+    "Mrow?",
+    "What is it, human? Meow?",
+    "Calling for meow?",
 ];
 
 module.exports = {

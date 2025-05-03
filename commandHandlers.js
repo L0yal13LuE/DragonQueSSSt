@@ -9,7 +9,7 @@ const { calculateNextLevelExp, getTodaysDateString } = require('./gameLogic');
  */
 const handleRankCommand = async (message, supabase) => {
     if (!supabase) {
-        message.reply('ฐานข้อมูลมีปัญหา เช็คอันดับไม่ได้จ้า 😥'); // Thai Error
+        message.reply('Database issue! Can\'t check rank. 😥');
         return;
     }
 
@@ -44,27 +44,27 @@ const handleRankCommand = async (message, supabase) => {
 
             const rankEmbed = new EmbedBuilder()
                 .setColor(0xFFD700) // Gold color for flair
-                .setTitle(`🌟 เลเวล 🌟`)
-                .setDescription(`${message.author.toString()} ขอส่องหน่อยซิว่าไปถึงไหนแล้ว!`)
+                .setTitle(`🌟 Level 🌟`)
+                .setDescription(`${message.author.toString()} Let's see how far you've come!`)
                 .setThumbnail(userAvatar)
                 .addFields(
-                    { name: 'เลเวลปัจจุบัน', value: `**${userLevel}**`, inline: true },
-                    { name: 'ค่าประสบการณ์ (EXP)', value: `${userExp} / ${nextLevelExp}`, inline: true },
-                    { name: 'ความคืบหน้าเลเวลถัดไป', value: `${progressBar} (${percentage.toFixed(1)}%)`, inline: false }
+                    { name: 'Current Level', value: `**${userLevel}**`, inline: true },
+                    { name: 'EXP', value: `${userExp} / ${nextLevelExp}`, inline: true },
+                    { name: 'Progress to Next Level', value: `${progressBar} (${percentage.toFixed(1)}%)`, inline: false }
                 )
-                .setFooter({ text: `สะสม EXP ต่อไปนะ สู้ๆ! 💪` })
+                .setFooter({ text: `Keep earning EXP! You can do it! 💪` })
                 .setTimestamp();
 
             message.reply({ embeds: [rankEmbed] });
             console.log(`[${username}] Replied to !rank in channel ${message.channel.name}.`);
 
         } else {
-            message.reply('คุณยังไม่มีอันดับเลยนะ! ส่งข้อความเพื่อเริ่มเก็บ EXP สิ! 💪'); // Thai Encouragement
+            message.reply('You don\'t have a rank yet! Chat to start earning EXP! 💪');
             console.log(`[${username}] User not found for !rank.`);
         }
     } catch (error) {
         console.error('Error during rank command:', error);
-        message.reply('อุ๊ปส์! มีข้อผิดพลาดตอนเช็คอันดับ ลองใหม่นะ'); // Thai Error
+        message.reply('Oops! Error checking rank. Try again.');
     }
 };
 
@@ -74,7 +74,7 @@ const handleRankCommand = async (message, supabase) => {
 const handleChatCommand = async (message, args) => {
     const userMessage = args.join(' ');
     if (!userMessage) {
-        message.reply('ลืมใส่ข้อความรึเปล่า? บอกหน่อยสิว่าจะให้พูดว่าอะไร 😉');
+        message.reply('Forgot to include a message? Tell me what to say! 😉');
         return;
     }
     try {
@@ -82,7 +82,7 @@ const handleChatCommand = async (message, args) => {
         console.log(`[${message.author.username}] Repeated chat message.`);
     } catch (error) {
         console.error('Error sending chat reply:', error);
-        message.reply('อ่า... ส่งข้อความนี้ไม่ได้แฮะ ขอโทษที 🙏');
+        message.reply('Uh-oh... Couldn\'t send that message. Sorry! 🙏');
     }
 };
 
@@ -91,7 +91,7 @@ const handleChatCommand = async (message, args) => {
  */
 const handleBagCommand = async (message, supabase) => {
     if (!supabase) {
-        message.reply('ฐานข้อมูลมีปัญหา เปิดกระเป๋าไม่ได้จ้า 😥');
+        message.reply('Database issue! Can\'t open bag. 😥');
         return;
     }
     const userId = message.author.id;
@@ -110,19 +110,19 @@ const handleBagCommand = async (message, supabase) => {
 
         const itemList = Object.values(groupedItems).length > 0
             ? Object.values(groupedItems).map(value => `${value.emoji} ${value.name}: ${value.amount}`).join('\n')
-            : "กระเป๋าว่างเปล่าเลย... แชทเล่นหาของกันเถอะ!";
+            : "Your bag is empty... Chat to find some items!";
 
         const bagEmbed = new EmbedBuilder()
             .setColor(0x8A2BE2)
-            .setTitle(`🎒 กระเป๋าของฉัน 🎒`)
-            .setDescription(`${message.author.toString()} เปิดดูข้างในกระเป๋าหน่อยสิ\n\n${itemList}`)
-            .setFooter({ text: `สะสมไอเทมเอาไว้นะเผื่อแลกรางวัล 😉` })
+            .setTitle(`🎒 My Bag 🎒`)
+            .setDescription(`${message.author.toString()} Let's see what's inside!\n\n${itemList}`)
+            .setFooter({ text: `Collect items for rewards! 😉` })
             .setTimestamp();
         message.reply({ embeds: [bagEmbed] });
         console.log(`[${username}] Replied to !bag.`);
     } catch (error) {
         console.error('Error during bag command:', error);
-        message.reply('อุ๊ปส์! มีข้อผิดพลาดตอนเปิดกระเป๋า ลองใหม่นะ');
+        message.reply('Oops! Error opening bag. Try again.');
     }
 };
 
@@ -131,7 +131,7 @@ const handleBagCommand = async (message, supabase) => {
  */
 const handleMonsterCommand = async (message, supabase, currentMonsterState) => {
     if (!supabase) {
-        message.reply('ฐานข้อมูลมีปัญหา เช็คสถานะมอนไม่ได้จ้า 😥');
+        message.reply('Database issue! Can\'t check monster status. 😥');
         return;
     }
     const today = getTodaysDateString();
@@ -152,35 +152,35 @@ const handleMonsterCommand = async (message, supabase, currentMonsterState) => {
                 const remainingHp = Math.max(0, monsterData.max_hp - totalDamage);
                 remainingHpText = remainingHp.toString();
                 if (remainingHp <= 0) {
-                    status = "☠️ (รออัพเดท)"; // Indicate defeat is imminent or pending update
+                    status = "☠️ (Update Pending)"; // Indicate defeat is imminent or pending update
                     color = 0x32CD32; // Show green if HP is 0 or less
                 }
             }
 
             const monsterEmbed = new EmbedBuilder()
                 .setColor(color)
-                .setTitle(`👽 สถานะมอนสเตอร์วันนี้ (${today}) 🦑`)
+                .setTitle(`👽 Today's Monster Status (${today}) 🦑`)
                 .addFields(
-                    { name: 'ชื่อ', value: monsterData.name, inline: true },
-                    { name: 'สถานะ', value: `**${status}**`, inline: true },
-                    { name: 'พลังชีวิต (HP)', value: `${remainingHpText} / ${monsterData.max_hp}`, inline: true },
+                    { name: 'Name', value: monsterData.name, inline: true },
+                    { name: 'Status', value: `**${status}**`, inline: true },
+                    { name: 'HP', value: `${remainingHpText} / ${monsterData.max_hp}`, inline: true },
                 )
                 .setTimestamp();
 
             if (!monsterData.is_alive && monsterData.killed_by_user_id) {
-                monsterEmbed.addFields({ name: 'ปิดจ๊อบโดย', value: `<@${monsterData.killed_by_user_id}>`, inline: true });
+                monsterEmbed.addFields({ name: 'Defeated By', value: `<@${monsterData.killed_by_user_id}>`, inline: true });
             }
             if (!monsterData.is_alive && monsterData.killed_at_timestamp) {
-                monsterEmbed.addFields({ name: 'เวลาที่ปราบ', value: `<t:${Math.floor(new Date(monsterData.killed_at_timestamp).getTime() / 1000)}:R>`, inline: true });
+                monsterEmbed.addFields({ name: 'Defeated At', value: `<t:${Math.floor(new Date(monsterData.killed_at_timestamp).getTime() / 1000)}:R>`, inline: true });
             }
             message.reply({ embeds: [monsterEmbed] });
         } else {
-            message.reply(`ยังไม่มีมอนสเตอร์เกิดวันนี้ (${today}) เลยนะ! 😴`);
+            message.reply(`No monster spawned today (${today})! 😴`);
             console.log(`No monster found for ${today} via !monster command.`);
         }
     } catch (error) {
         console.error('Error during monster command:', error);
-        message.reply('อุ๊ปส์! มีข้อผิดพลาดตอนเช็คสถานะมอนสเตอร์ ลองใหม่นะ');
+        message.reply('Oops! Error checking monster status. Try again.');
     }
 };
 

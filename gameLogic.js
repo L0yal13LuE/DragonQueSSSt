@@ -10,6 +10,9 @@ const {
 } = require('./dbUtils');
 const { handleLevelUpAnnouncement, announceMonsterSpawn, announceMonsterDefeat } = require('./announcements');
 
+const { disAllowChannelArray } = require('./disAllowChannelArray.js'); // don't get exp on these channel
+const { handleDropByLocation } = require('./dropItem.js'); // don't get exp on these channel
+
 /**
  * Gets the current UTC date as a string 'YYYY-MM-DD'.
  */
@@ -61,34 +64,39 @@ const spawnNewMonster = async (supabase, dateString) => {
  */
 const handleItemDrop = async (supabase, userId, channelId, message, announcementChannel) => {
     // manual fixed drop rate on every channel
-    const dropConfig = { dropRate: 0.33, dropItems: MATERIAL_LIST };
-    if (!dropConfig) return;
+    // const dropConfig = { dropRate: 0.33, dropItems: MATERIAL_LIST };
+    // if (!dropConfig) return;
 
-    const randomChance = Math.random();
-    if (randomChance < dropConfig.dropRate) {
-        const possibleItems = dropConfig.dropItems;
-        if (!possibleItems || possibleItems.length === 0) return;
+    //const randomChance = Math.random();
+    //if (randomChance < dropConfig.dropRate) {
+    //    const possibleItems = dropConfig.dropItems;
+    //    if (!possibleItems || possibleItems.length === 0) return;
 
-        const randomItem = possibleItems[Math.floor(Math.random() * possibleItems.length)];
+    const randomItemArray = handleDropByLocation(channelId);
+    // console.log('handleItemDrop > randomItemArray', randomItemArray);
+    if (randomItemArray.length > 0) {
+        const randomItem = randomItemArray[0];
+        // console.log('handleItemDrop > randomItem', randomItem);
+        // const randomItem = possibleItems[Math.floor(Math.random() * possibleItems.length)];
         const itemAmount = 1;
-
         const itemInserted = await insertUserItem(supabase, userId, channelId, randomItem, itemAmount, new Date().toISOString());
 
         if (itemInserted && announcementChannel) {
             console.log(`[${message.author.username}] Sending item drop announcement.`);
             const itemDropEmbed = new EmbedBuilder()
-                .setColor(0xFFD700).setTitle('✨ เจอไอเทม! ✨')
-                .setDescription(`${message.author.toString()} สุ่มได้ของ!`)
+                .setColor(0xFFD700).setTitle('✨ Found Item! ✨')
+                .setDescription(`${message.author.toString()} got the item!`)
                 .addFields(
-                    { name: 'ไอเทม', value: `${randomItem.emoji} ${randomItem.name}`, inline: true },
-                    { name: 'จำนวน', value: itemAmount.toString(), inline: true },
-                    { name: 'เจอที่', value: `<#${channelId}>`, inline: true }
+                    { name: 'Item', value: `${randomItem.emoji} ${randomItem.name}`, inline: true },
+                    { name: 'Amount', value: itemAmount.toString(), inline: true },
+                    { name: 'Location', value: `<#${channelId}>`, inline: true }
                 ).setTimestamp();
             announcementChannel.send({ embeds: [itemDropEmbed] });
         } else if (itemInserted) {
             console.warn(`[${message.author.username}] Earned item, but announcement channel unavailable for announcement.`);
         }
     }
+    //}
 };
 
 /**
@@ -136,7 +144,7 @@ const handleExpGain = async (message, supabase, userCooldowns, announcementChann
     const username = message.author.username;
     const currentMessageTimestamp = message.createdTimestamp;
 
-    if (message.author.bot || !supabase) return;
+    if (message.author.bot || !supabase || disAllowChannelArray(message.channel.id)) return;
 
     try {
         let userData = await getUser(supabase, userId);
@@ -247,8 +255,8 @@ const hourlyMonsterCheck = async (supabase, client, announcementChannel, current
                 console.error(`Failed to mark overdue monster ${yesterday} defeated.`);
             }
         } else if (yesterdaysMonster && !yesterdaysMonster.is_alive && yesterdaysMonster.is_reward_announced) {
-             // Clean up hits if yesterday's monster is dead and announced
-             await deleteMonsterHits(supabase, yesterday);
+            // Clean up hits if yesterday's monster is dead and announced
+            await deleteMonsterHits(supabase, yesterday);
         }
 
         // --- Check Today's Monster ---
@@ -283,8 +291,8 @@ const hourlyMonsterCheck = async (supabase, client, announcementChannel, current
                     await announceMonsterDefeat(supabase, announcementChannel, currentMonsterStateRef.current);
                     if (currentMonsterStateRef.current) currentMonsterStateRef.current.is_reward_announced = true; // Mark announced in state
                 } else if (!defeatedNow) {
-                     console.warn(`Hourly Check: Failed to mark ${today} defeated via check function (might be done). Re-fetching.`);
-                     currentMonsterStateRef.current = await getMonsterForDate(supabase, today); // Re-sync state
+                    console.warn(`Hourly Check: Failed to mark ${today} defeated via check function (might be done). Re-fetching.`);
+                    currentMonsterStateRef.current = await getMonsterForDate(supabase, today); // Re-sync state
                 }
             } else {
                 console.log(`Hourly Check: Monster ${currentMonsterStateRef.current.name} correctly marked alive.`);
