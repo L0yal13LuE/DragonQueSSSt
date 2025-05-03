@@ -10,6 +10,8 @@ const {
 } = require('./dbUtils');
 const { handleLevelUpAnnouncement, announceMonsterSpawn, announceMonsterDefeat } = require('./announcements');
 
+const { disAllowChannelArray } = require('./disAllowChannelArray.js'); // don't get exp on these channel
+
 /**
  * Gets the current UTC date as a string 'YYYY-MM-DD'.
  */
@@ -136,7 +138,7 @@ const handleExpGain = async (message, supabase, userCooldowns, announcementChann
     const username = message.author.username;
     const currentMessageTimestamp = message.createdTimestamp;
 
-    if (message.author.bot || !supabase) return;
+    if (message.author.bot || !supabase || disAllowChannelArray(message.channel.id)) return;
 
     try {
         let userData = await getUser(supabase, userId);
