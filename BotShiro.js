@@ -17,6 +17,7 @@ const commandHandlers = require('./commandHandlers'); // Assuming command handle
 
 // --- Command Handlers ---
 const { handleSpinCommand } = require('./managers/spinManager.js'); // Import the spin command handler
+const { handleMaterialCommand } = require('./managers/materialManager.js');
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -110,6 +111,7 @@ client.on('messageCreate', async (message) => {
         else if (command === 'bag') commandHandlers.handleBagCommand(message, supabase);
         else if (command === 'monster') commandHandlers.handleMonsterCommand(message, supabase, currentMonsterStateRef.current); // Pass current state
         else if (command === 'spin') handleSpinCommand(message, supabase); // Keep using the imported manager
+        else if (command === 'material') handleMaterialCommand(message, supabase); // Keep using the imported manager
         // Add other commands here
     }
     // Non-Command Message Processing
