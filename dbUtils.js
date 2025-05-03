@@ -312,8 +312,63 @@ const deleteMonsterHits = async (supabase, monsterDate) => {
     }
 };
 
+/**
+ * get shop setting
+ */
+const getShop = async (supabase, channelId) => {
+    if (!supabase) return null;
+    try {
+        const { data: shopData, error } = await supabase.from('shops')
+            .select('*')
+            .eq('channelid', channelId)
+            .single(); // Add single() if each channel ID should only have one shop
+        
+        if (error) {
+            console.error(`Error fetching shop for channel ${channelId}:`, error.message);
+            return null;
+        }
+        
+        if (!shopData) {
+            console.log(`No shop found for channel ${channelId}`);
+        }
+        
+        return shopData;
+    } catch (error) {
+        console.error(`Unexpected error fetching shop for ${channelId}:`, error);
+        return null;
+    }
+};
+
+/**
+ * Retrieves all items in shop
+ */
+const getShopItems = async (supabase, shopId) => {
+    if (!supabase) return null;
+    try {
+        const { data: shopItems, error } = await supabase.from('shop_items')
+            .select('*')
+            .eq('shop_id', shopId)
+            .order('created_at'); // Add ordering if needed
+            
+        if (error) {
+            console.error(`Error fetching items for shop ${shopId}:`, error.message);
+            return null;
+        }
+        
+        if (!shopItems || shopItems.length === 0) {
+            console.log(`No items found for shop ${shopId}`);
+        }
+        
+        return shopItems;
+    } catch (error) {
+        console.error(`Unexpected error fetching items for shop ${shopId}:`, error);
+        return null;
+    }
+};
+
 module.exports = {
     getUser, insertUser, updateUser, updateUsername, insertUserItem, getUserItems,
     getMonsterForDate, createMonster, logMonsterHit, getTotalDamageDealt,
-    markMonsterAsDefeated, markRewardAnnounced, deleteMonsterHits
+    markMonsterAsDefeated, markRewardAnnounced, deleteMonsterHits,
+    getShop, getShopItems
 };
