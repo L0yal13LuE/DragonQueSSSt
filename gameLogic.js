@@ -10,8 +10,11 @@ const {
 } = require('./dbUtils');
 const { handleLevelUpAnnouncement, announceMonsterSpawn, announceMonsterDefeat } = require('./announcements');
 
-const { disAllowChannelArray } = require('./disAllowChannelArray.js'); // don't get exp on these channel
+const { disAllowChannelArray } = require('./disAllowChannelArray.js'); // TODO remove (still have to keep it cause COCO still use this)
 const { handleDropByLocation } = require('./dropItem.js'); // don't get exp on these channel
+
+const { getChannel } = require('./providers/channelProvider');
+const { handleItemDropV2 } = require('./managers/itemManager.js');
 
 /**
  * Gets the current UTC date as a string 'YYYY-MM-DD'.
@@ -144,7 +147,10 @@ const handleExpGain = async (message, supabase, userCooldowns, announcementChann
     const username = message.author.username;
     const currentMessageTimestamp = message.createdTimestamp;
 
-    if (message.author.bot || !supabase || disAllowChannelArray(message.channel.id)) return;
+    const allowedChannelData = await getChannel(supabase, {isGainExp: true});
+    const isChannelAllowed = allowedChannelData && allowedChannelData.some(channel => channel.id === message.channel.id);
+
+    if (message.author.bot || !supabase || !isChannelAllowed) return;
 
     try {
         let userData = await getUser(supabase, userId);
@@ -211,7 +217,8 @@ const handleExpGain = async (message, supabase, userCooldowns, announcementChann
                 console.error(`[${username}] Leveled up but failed DB update.`);
             }
 
-            await handleItemDrop(supabase, userId, message.channel.id, message, itemDropChannel);
+            // await handleItemDrop(supabase, userId, message.channel.id, message, itemDropChannel);
+            await handleItemDropV2(supabase, message, itemDropChannel);
 
         } else {
             // Update username even if on cooldown
