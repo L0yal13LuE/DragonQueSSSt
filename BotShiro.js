@@ -17,13 +17,12 @@ const commandHandlers = require('./commandHandlers'); // Assuming command handle
 
 // --- Command Handlers ---
 const { handleSpinCommand } = require('./managers/spinManager.js'); // Import the spin command handler
-const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
-const { handleShopCommand, handlePressBuy } = require('./managers/shopManager.js');
-const { shopSettings } = require('./managers/shopWorkshop.js')
+const { handleMaterialCommand } = require('./managers/materialManager.js');
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
 const ANNOUNCEMENT_CHANNEL_ID = process.env.ANNOUNCEMENT_CHANNEL_ID; // For level-ups ONLY
+const ITEM_DROP_CHANNEL_ID = process.env.ITEM_DROP_CHANNEL_ID; // For item-drop- ONLY
 
 const CHANNEL_ID_1 = ANNOUNCEMENT_CHANNEL_ID; 
 
@@ -63,6 +62,7 @@ const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) ? createClient(SUPABASE_URL
 // --- Caches and State ---
 const userCooldowns = new Collection();
 let announcementChannel = null;
+let itemDropChannel = null;
 
 // Use a reference object for currentMonsterState so modules can update it
 let currentMonsterStateRef = { current: null };
@@ -82,6 +82,15 @@ client.once('ready', async () => {
             if (announcementChannel) console.log(`Announcement channel found: ${announcementChannel.name}`);
             else console.error(`Could not find announcement channel: ${ANNOUNCEMENT_CHANNEL_ID}`);
         } catch (error) { console.error(`Error fetching announcement channel:`, error); announcementChannel = null; }
+    }
+
+    // Fetch Channel Objects
+    if (ITEM_DROP_CHANNEL_ID) {
+        try {
+            itemDropChannel = await client.channels.fetch(ITEM_DROP_CHANNEL_ID);
+            if (itemDropChannel) console.log(`Item drop channel found: ${itemDropChannel.name}`);
+            else console.error(`Could not find item drop channel: ${ITEM_DROP_CHANNEL_ID}`);
+        } catch (error) { console.error(`Error fetching item drop channel:`, error); itemDropChannel = null; }
     }
 
     // Send Online Announcement
@@ -126,6 +135,7 @@ client.on('messageCreate', async (message) => {
         else if (command === 'bag') commandHandlers.handleBagCommand(message, supabase);
         else if (command === 'monster') commandHandlers.handleMonsterCommand(message, supabase, currentMonsterStateRef.current); // Pass current state
         else if (command === 'spin') handleSpinCommand(message, supabase); // Keep using the imported manager
+        else if (command === 'material') handleMaterialCommand(message, supabase); // Keep using the imported manager
         // Add other commands here
     }
     // Non-Command Message Processing
@@ -147,7 +157,7 @@ client.on('messageCreate', async (message) => {
         // --- END BOT MENTION CHECK ---
 
         // Pass necessary dependencies and the state reference object
-        gameLogic.handleExpGain(message, supabase, userCooldowns, announcementChannel, currentMonsterStateRef);
+        gameLogic.handleExpGain(message, supabase, userCooldowns, announcementChannel, itemDropChannel, currentMonsterStateRef);
     }
 });
 
