@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({
     path: {
@@ -18,6 +18,11 @@ const commandHandlers = require('./commandHandlers'); // Assuming command handle
 // --- Command Handlers ---
 const { handleSpinCommand } = require('./managers/spinManager.js'); // Import the spin command handler
 const { handleMaterialCommand } = require('./managers/materialManager.js');
+
+// -- Addition Command Handlers ---
+const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
+const { handleShopCommand, handlePressBuy } = require('./managers/shopManager.js');
+const { shopSettings } = require('./managers/shopWorkshop.js'); // shop setting getter from db
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -67,6 +72,9 @@ let itemDropChannel = null;
 // Use a reference object for currentMonsterState so modules can update it
 let currentMonsterStateRef = { current: null };
 
+// -- Shop instance
+let shopWorkShopSettings = null;
+
 // --- Bot Ready Event ---
 client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
@@ -97,6 +105,14 @@ client.once('ready', async () => {
         console.warn("Announcement channel unavailable, cannot send online announcement.");
     }
 
+    // Fetch shop from DB by channelId (TODO: get channel from DB, no more manual input)
+    // shopWorkShopSettings = await shopSettings(supabase, '1367030652834283590');
+    // if (shopWorkShopSettings) {
+    //     console.log(`[Shop] found: ${shopWorkShopSettings.title}`);
+    // } else {
+    //     console.log(`[Shop] not found: ${shopWorkShopSettings}`);
+    // }
+    
     // Setup Hourly Monster Check
     if (supabase && announcementChannel) {
         console.log("Setting up hourly monster check...");
@@ -118,7 +134,9 @@ client.on('messageCreate', async (message) => {
         const command = args.shift().toLowerCase();
 
         if (command === 'rank' || command === 'level') commandHandlers.handleRankCommand(message, supabase);
-        else if (command === 'chat') commandHandlers.handleChatCommand(message, args);
+        // else if (command === 'leaderboard') handleLeaderboardCommand(message, supabase, client); // TODO: still need to be implemented more
+        else if (command === 'shop' && shopWorkShopSettings) handleShopCommand(message, shopWorkShopSettings);
+        // else if (command === 'chat') commandHandlers.handleChatCommand(message, args); // useless ?
         else if (command === 'bag') commandHandlers.handleBagCommand(message, supabase);
         else if (command === 'monster') commandHandlers.handleMonsterCommand(message, supabase, currentMonsterStateRef.current); // Pass current state
         else if (command === 'spin') handleSpinCommand(message, supabase); // Keep using the imported manager
@@ -133,28 +151,24 @@ client.on('messageCreate', async (message) => {
             // Select a random cat reply
             const randomIndex = Math.floor(Math.random() * CONSTANTS.catReplies.length);
             const replyText = CONSTANTS.catReplies[randomIndex];
-
             try {
-                // Reply to the user's message
                 await message.reply(replyText);
                 console.log(`[${message.author.username}] Mentioned the bot. Replied with: ${replyText}`);
             } catch (error) {
                 console.error("Error sending cat reply:", error);
             }
-            // Stop further processing (like EXP gain) for this message after replying
             return;
         }
         // --- END BOT MENTION CHECK ---
 
-        // If not mentioned, proceed with normal EXP gain logic
-        // Add Supabase check back here specifically for EXP gain
-        if (!supabase) {
-            // console.log("Supabase not available, skipping EXP gain."); // Can be noisy
-            return;
-        }
         // Pass necessary dependencies and the state reference object
         gameLogic.handleExpGain(message, supabase, userCooldowns, announcementChannel, itemDropChannel, currentMonsterStateRef);
     }
+});
+
+// Handle button interactions
+client.on(Events.InteractionCreate, async interaction => {
+    if (shopWorkShopSettings) await handlePressBuy(interaction, shopWorkShopSettings);
 });
 
 // --- Login to Discord ---
