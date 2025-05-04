@@ -139,7 +139,7 @@ const checkAndProcessMonsterDefeat = async (supabase, monsterDate, lastHitUserId
 /**
  * Processes messages for EXP gain, leveling, item drops, and monster damage logging/checking.
  */
-const handleExpGain = async (message, supabase, userCooldowns, announcementChannel, currentMonsterStateRef) => {
+const handleExpGain = async (message, supabase, userCooldowns, announcementChannel, itemDropChannel, currentMonsterStateRef) => {
     const userId = message.author.id;
     const username = message.author.username;
     const currentMessageTimestamp = message.createdTimestamp;
@@ -211,7 +211,7 @@ const handleExpGain = async (message, supabase, userCooldowns, announcementChann
                 console.error(`[${username}] Leveled up but failed DB update.`);
             }
 
-            await handleItemDrop(supabase, userId, message.channel.id, message, announcementChannel);
+            await handleItemDrop(supabase, userId, message.channel.id, message, itemDropChannel);
 
         } else {
             // Update username even if on cooldown
