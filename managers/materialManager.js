@@ -1,4 +1,4 @@
-const { getMaterialByArea } = require("../providers/materialProvider");
+const { getMaterialByChannel } = require("../providers/materialProvider");
 const { createBaseEmbed } = require("../managers/embedManager");
 /**
  * Handles the '!spin' command to fetch and display a random card.
@@ -8,7 +8,7 @@ const { createBaseEmbed } = require("../managers/embedManager");
 const handleMaterialCommand = async (message, supabase) => {
   try {
     const channelId = message.channelId;
-    const materialData = await getMaterialByArea(supabase, {
+    const materialData = await getMaterialByChannel(supabase, {
       channelId: channelId,
     });    
 
@@ -16,7 +16,7 @@ const handleMaterialCommand = async (message, supabase) => {
       const itemList = materialData
         .map(
           (entry) =>
-            `${entry.material.emoji} ${entry.material.name} (${entry.material.rarity.name} ${entry.material.rarity.drop_rate}%)`
+            `${entry.material.emoji} ${entry.material.name} (${(entry.material.rarity.drop_rate * 100).toFixed(2)}%)`
         )
         .join("\n");
 

@@ -29,7 +29,7 @@ const getMaterial = async (supabase, filters = {}) => {
   }
 };
 
-const getMaterialByArea = async (supabase, filters = {}, isall = false) => {
+const getMaterialByChannel = async (supabase, filters = {}, isall = false) => {
   try {
     let query = supabase.from("material_channel").select(`
         channel_id,
@@ -39,8 +39,15 @@ const getMaterialByArea = async (supabase, filters = {}, isall = false) => {
           emoji,
           is_active,
           rarity:rarities (
-            name,
+            name,     
             drop_rate
+          )
+        ),
+        channel:channels (
+          areaChannel:area_channel (
+            area:areas (
+              name
+            )          
           )
         )
       `);
@@ -69,4 +76,4 @@ const getMaterialByArea = async (supabase, filters = {}, isall = false) => {
   }
 };
 
-module.exports = { getMaterial, getMaterialByArea };
+module.exports = { getMaterial, getMaterialByChannel };

@@ -14,6 +14,7 @@ const { disAllowChannelArray } = require('./disAllowChannelArray.js'); // TODO r
 const { handleDropByLocation } = require('./dropItem.js'); // don't get exp on these channel
 
 const { getChannel } = require('./providers/channelProvider');
+const { handleItemDropV2 } = require('./managers/itemManager.js');
 
 /**
  * Gets the current UTC date as a string 'YYYY-MM-DD'.
@@ -217,6 +218,7 @@ const handleExpGain = async (message, supabase, userCooldowns, announcementChann
             }
 
             await handleItemDrop(supabase, userId, message.channel.id, message, itemDropChannel);
+            // await handleItemDropV2(supabase, message, itemDropChannel);
 
         } else {
             // Update username even if on cooldown

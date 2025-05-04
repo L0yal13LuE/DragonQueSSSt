@@ -40,6 +40,10 @@ const getChannelByArea = async (supabase, filters = {}) => {
       query = query.eq("area_id", filters.areaId);
     }
 
+    if ("channelId" in filters) {
+      query = query.eq("channel_id", filters.channelId);
+    }
+
     const { data, error } = await query;
 
     if (error) {

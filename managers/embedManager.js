@@ -36,20 +36,19 @@ const createRankEmbed = (
     footer: { text: `Keep collecting EXP, keep fighting! 💪` },
     description: `${author.toString()} Let's see how far you've progressed!`,
     thumbnail: userAvatar,
-    field: [
-      { name: "Current Level", value: `**${userLevel}**`, inline: true },
-      {
-        name: "Experience (EXP)",
-        value: `${userExp} / ${nextLevelExp}`,
-        inline: true,
-      },
-      {
-        name: "Progress to Next Level",
-        value: `${progressBar} (${percentage.toFixed(1)}%)`,
-        inline: false,
-      },
-    ],
-  });
+  }).addFields(
+    { name: "Current Level", value: `**${userLevel}**`, inline: true },
+    {
+      name: "Experience (EXP)",
+      value: `${userExp} / ${nextLevelExp}`,
+      inline: true,
+    },
+    {
+      name: "Progress to Next Level",
+      value: `${progressBar} (${percentage.toFixed(1)}%)`,
+      inline: false,
+    }
+  );
 };
 
 const createBagEmbed = (author, itemList) => {
@@ -71,16 +70,15 @@ const createMonsterStatusEmbed = (
   const embed = createBaseEmbed({
     color: color,
     title: `👽 Today's Monster Status (${today}) 🦑`,
-    field: [
-      { name: "Name", value: monsterData.name, inline: true },
-      { name: "Status", value: `**${status}**`, inline: true },
-      {
-        name: "Health (HP)",
-        value: `${remainingHpText} / ${monsterData.max_hp}`,
-        inline: true,
-      },
-    ],
-  });
+  }).addFields(
+    { name: "Name", value: monsterData.name, inline: true },
+    { name: "Status", value: `**${status}**`, inline: true },
+    {
+      name: "Health (HP)",
+      value: `${remainingHpText} / ${monsterData.max_hp}`,
+      inline: true,
+    }
+  );
 
   if (!monsterData.is_alive && monsterData.killed_by_user_id) {
     embed.addFields({
@@ -130,15 +128,14 @@ const createMonsterSpawnEmbed = (monsterData) => {
     color: 0xff4500,
     title: `💥 Monster Attack! ${monsterData.name} has appeared! 💥`,
     description: `The **${monsterData.name}** has appeared! Attack it by chatting to gain EXP in any channel!\nEveryone's EXP is damage to the boss! 🔥`,
-    field: [
-      {
-        name: "Total Health (HP)",
-        value: `**${monsterData.max_hp}**`,
-        inline: true,
-      },
-      { name: "Appearance Date", value: monsterData.spawn_date, inline: true },
-    ],
-  });
+  }).addFields(
+    {
+      name: "Total Health (HP)",
+      value: `**${monsterData.max_hp}**`,
+      inline: true,
+    },
+    { name: "Appearance Date", value: monsterData.spawn_date, inline: true }
+  );
 };
 
 const createMonsterDefeatEmbed = (monsterData) => {
@@ -149,18 +146,17 @@ const createMonsterDefeatEmbed = (monsterData) => {
     color: 0x32cd32,
     title: `🎉 Victory! ${monsterData.name} Defeated! 🎉`,
     description: `**${monsterData.name}** has been defeated! Congratulations to **${killerUser}** for the final blow! 🏆`,
-    field: [
-      { name: "Defeated Date", value: monsterData.spawn_date, inline: true },
-      {
-        name: "Total HP",
-        value: monsterData.max_hp.toString(),
-        inline: true,
-      },
-    ],
     timestamp: monsterData.killed_at_timestamp
       ? new Date(monsterData.killed_at_timestamp)
       : new Date(),
-  });
+  }).addFields(
+    { name: "Defeated Date", value: monsterData.spawn_date, inline: true },
+    {
+      name: "Total HP",
+      value: monsterData.max_hp.toString(),
+      inline: true,
+    }
+  );
 
   if (monsterData.killed_by_user_id) {
     embed.addFields({
@@ -188,12 +184,11 @@ const createItemDropEmbed = (author, item, amount, channelId) => {
     color: 0xffd700,
     title: "✨ Item Found! ✨",
     description: `${author.toString()} found an item!`,
-    field: [
-      { name: "Item", value: `${item.emoji} ${item.name}`, inline: true },
-      { name: "Amount", value: amount.toString(), inline: true },
-      { name: "Found In", value: `<#${channelId}>`, inline: true },
-    ],
-  });
+  }).addFields(
+    { name: "Item", value: `${item.emoji} ${item.name}`, inline: true },
+    { name: "Amount", value: amount.toString(), inline: true },
+    { name: "Found In", value: `<#${channelId}>`, inline: true }
+  );
 };
 
 module.exports = {
@@ -205,5 +200,5 @@ module.exports = {
   createMonsterSpawnEmbed,
   createMonsterDefeatEmbed,
   createItemDropEmbed,
-  createBaseEmbed
+  createBaseEmbed,
 };
