@@ -217,8 +217,8 @@ const handleExpGain = async (message, supabase, userCooldowns, announcementChann
                 console.error(`[${username}] Leveled up but failed DB update.`);
             }
 
-            await handleItemDrop(supabase, userId, message.channel.id, message, itemDropChannel);
-            // await handleItemDropV2(supabase, message, itemDropChannel);
+            // await handleItemDrop(supabase, userId, message.channel.id, message, itemDropChannel);
+            await handleItemDropV2(supabase, message, itemDropChannel);
 
         } else {
             // Update username even if on cooldown
