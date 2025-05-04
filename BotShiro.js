@@ -19,6 +19,10 @@ const commandHandlers = require('./commandHandlers'); // Assuming command handle
 const { handleSpinCommand } = require('./managers/spinManager.js'); // Import the spin command handler
 const { handleMaterialCommand } = require('./managers/materialManager.js');
 
+// -- Addition Command Handlers ---
+const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
+const { handleShopCommand, handlePressBuy } = require('./managers/shopManager.js');
+
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
 const ANNOUNCEMENT_CHANNEL_ID = process.env.ANNOUNCEMENT_CHANNEL_ID; // For level-ups ONLY
