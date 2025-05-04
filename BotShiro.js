@@ -22,6 +22,7 @@ const { handleMaterialCommand } = require('./managers/materialManager.js');
 // -- Addition Command Handlers ---
 const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
 const { handleShopCommand, handlePressBuy } = require('./managers/shopManager.js');
+const { shopSettings } = require('./managers/shopWorkshop.js'); // shop setting getter from db
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -71,7 +72,7 @@ let itemDropChannel = null;
 // Use a reference object for currentMonsterState so modules can update it
 let currentMonsterStateRef = { current: null };
 
-// Shop instance
+// -- Shop instance
 let shopWorkShopSettings = null;
 
 // --- Bot Ready Event ---
@@ -104,13 +105,13 @@ client.once('ready', async () => {
         console.warn("Announcement channel unavailable, cannot send online announcement.");
     }
 
-    // init shop
-    shopWorkShopSettings = await shopSettings(supabase, '1367030652834283590');
-    if (shopWorkShopSettings) {
-        console.log(`[Shop] found: ${shopWorkShopSettings.title}`);
-    } else {
-        console.log(`[Shop] not found: ${shopWorkShopSettings}`);
-    }
+    // Fetch shop from DB by channelId (TODO: get channel from DB, no more manual input)
+    // shopWorkShopSettings = await shopSettings(supabase, '1367030652834283590');
+    // if (shopWorkShopSettings) {
+    //     console.log(`[Shop] found: ${shopWorkShopSettings.title}`);
+    // } else {
+    //     console.log(`[Shop] not found: ${shopWorkShopSettings}`);
+    // }
     
     // Setup Hourly Monster Check
     if (supabase && announcementChannel) {
@@ -133,9 +134,9 @@ client.on('messageCreate', async (message) => {
         const command = args.shift().toLowerCase();
 
         if (command === 'rank' || command === 'level') commandHandlers.handleRankCommand(message, supabase);
-        else if (command === 'leaderboard') handleLeaderboardCommand(message, supabase, client);
+        // else if (command === 'leaderboard') handleLeaderboardCommand(message, supabase, client); // TODO: still need to be implemented more
         else if (command === 'shop' && shopWorkShopSettings) handleShopCommand(message, shopWorkShopSettings);
-        else if (command === 'chat') commandHandlers.handleChatCommand(message, args);
+        // else if (command === 'chat') commandHandlers.handleChatCommand(message, args); // useless ?
         else if (command === 'bag') commandHandlers.handleBagCommand(message, supabase);
         else if (command === 'monster') commandHandlers.handleMonsterCommand(message, supabase, currentMonsterStateRef.current); // Pass current state
         else if (command === 'spin') handleSpinCommand(message, supabase); // Keep using the imported manager
