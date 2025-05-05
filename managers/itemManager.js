@@ -10,7 +10,7 @@ const handleItemDropV2 = async (supabase, message, channel) => {
 
   // 1. Determine Item List and Area Type
   const materialData = await getMaterialByChannel(supabase, {
-    channelId: channelId,
+    channelId: message.channel.id,
   });
 
   if (!materialData || materialData.length === 0) return;
