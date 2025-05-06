@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
+const { supabase } = require('./supabaseClient');
 const { markRewardAnnounced, deleteMonsterHits } = require('./dbUtils'); // Need DB utils here
 
 /**
@@ -69,10 +70,11 @@ const announceMonsterSpawn = (announcementChannel, monsterData) => {
 /**
  * Announces monster defeat in the announcement channel, marks reward announced in DB, and deletes hits.
  */
-const announceMonsterDefeat = async (supabase, announcementChannel, monsterData) => {
+const announceMonsterDefeat = async (announcementChannel, monsterData) => {
     if (!announcementChannel || !monsterData) {
         console.warn("Cannot announce monster defeat: Channel or monster data missing."); return;
     }
+    if (!supabase) { console.warn("Cannot announce monster defeat: Supabase client missing."); return; }
     const killerUser = monsterData.killed_by_user_id ? `<@${monsterData.killed_by_user_id}>` : "เหล่านักผจญภัย";
     const defeatEmbed = new EmbedBuilder()
         .setColor(0x32CD32).setTitle(`🎉 ชัยชนะ! ปราบ ${monsterData.name} สำเร็จ! 🎉`)
@@ -93,8 +95,8 @@ const announceMonsterDefeat = async (supabase, announcementChannel, monsterData)
     try {
         await announcementChannel.send({ content: "@everyone กำจัดมอนสเตอร์ประจำวันสำเร็จ!", embeds: [defeatEmbed] });
         console.log(`Announced defeat of ${monsterData.name}`);
-        await markRewardAnnounced(supabase, monsterData.spawn_date);
-        await deleteMonsterHits(supabase, monsterData.spawn_date); // Delete hits after successful announcement and marking
+        await markRewardAnnounced(monsterData.spawn_date);
+        await deleteMonsterHits(monsterData.spawn_date); // Delete hits after successful announcement and marking
     } catch (error) {
         console.error(`Error sending monster defeat announcement, marking reward, or deleting hits for ${monsterData.spawn_date}:`, error);
     }

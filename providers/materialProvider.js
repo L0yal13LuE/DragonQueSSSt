@@ -1,5 +1,8 @@
-const getMaterial = async (supabase, filters = {}) => {
+const { supabase } = require('../supabaseClient');
+
+const getMaterial = async (filters = {}) => {
   try {
+    if (!supabase) { console.error("Supabase client not available in getMaterial"); return null; }
     let query = supabase.from("materials").select("*");
 
     // Dynamically apply filters if provided
@@ -29,8 +32,9 @@ const getMaterial = async (supabase, filters = {}) => {
   }
 };
 
-const getMaterialByChannel = async (supabase, filters = {}, isall = false) => {
+const getMaterialByChannel = async (filters = {}, isall = false) => {
   try {
+    if (!supabase) { console.error("Supabase client not available in getMaterialByChannel"); return null; }
     let query = supabase.from("material_channel").select(`
         channel_id,
         is_active,

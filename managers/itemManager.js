@@ -1,15 +1,16 @@
+const { supabase } = require('../supabaseClient');
 const { getMaterialByChannel } = require("../providers/materialProvider");
 const { getConfig } = require("../providers/configProvider");
 const { insertUserItem } = require("../dbUtils");
 const { createBaseEmbed } = require("./embedManager");
 
 let baseDropRate = 0.15;
-
-const handleItemDropV2 = async (supabase, message, channel) => {
+const handleItemDropV2 = async (message, channel) => {
   const channelId = channel.id;
+  if (!supabase) { console.warn("[ItemDropV2] Supabase client not available."); return []; }
 
   // 1. Determine Item List and Area Type
-  const materialData = await getMaterialByChannel(supabase, {
+  const materialData = await getMaterialByChannel({
     channelId: message.channel.id,
   });
 
@@ -31,7 +32,6 @@ const handleItemDropV2 = async (supabase, message, channel) => {
 
   // 2. Calculate Total Drop Probability for the Area
   const totalAreaDropProbability = await calculateTotalDropProbability(
-    supabase,
     itemList
   );
 
@@ -66,7 +66,6 @@ const handleItemDropV2 = async (supabase, message, channel) => {
     // 5. Insert item
     const itemAmount = 1;
     const itemInserted = await insertUserItem(
-      supabase,
       message.author.id,
       channelId,
       selectedItem,
@@ -111,10 +110,11 @@ const handleItemDropV2 = async (supabase, message, channel) => {
   }
 };
 
-const calculateTotalDropProbability = async (supabase, itemList) => {
+const calculateTotalDropProbability = async (itemList) => {
   let totalProbability = 0;
+  if (!supabase) { console.warn("[calculateTotalDropProbability] Supabase client not available. Using default baseDropRate."); }
 
-  const configData = await getConfig(supabase, {
+  const configData = await getConfig({
     key: "base_drop_rate",
   });
 
