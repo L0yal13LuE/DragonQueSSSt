@@ -1,16 +1,14 @@
-const { supabase } = require('../supabaseClient');
 const { getMaterialByChannel } = require("../providers/materialProvider");
 const { createBaseEmbed } = require("../managers/embedManager");
 /**
  * Handles the '!spin' command to fetch and display a random card.
  * @param {object} message - The Discord message object.
+ * @param {object} supabase - The Supabase client instance.
  */
-const handleMaterialCommand = async (message) => {
+const handleMaterialCommand = async (message, supabase) => {
   try {
-    if (!supabase) { message.reply("ฐานข้อมูลมีปัญหา โปรดติดต่อผู้ดูแล"); return; }
-
     const channelId = message.channelId;
-    const materialData = await getMaterialByChannel({
+    const materialData = await getMaterialByChannel(supabase, {
       channelId: channelId,
     });    
 

@@ -1,23 +1,15 @@
-const { supabase } = require("../supabaseClient");
-const {
-  getMaterialByChannel,
-  getUserItem,
-  insertUserItem,
-  updateUserItem,
-} = require("../providers/materialProvider");
+const { getMaterialByChannel } = require("../providers/materialProvider");
 const { getConfig } = require("../providers/configProvider");
+const { insertUserItem } = require("../dbUtils");
 const { createBaseEmbed } = require("./embedManager");
 
 let baseDropRate = 0.15;
-const handleItemDropV2 = async (message, channel) => {
-  const channelId = message.channel.id;
-  if (!supabase) {
-    console.warn("[ItemDropV2] Supabase client not available.");
-    return [];
-  }
+
+const handleItemDropV2 = async (supabase, message, channel) => {
+  const channelId = channel.id;
 
   // 1. Determine Item List and Area Type
-  const materialData = await getMaterialByChannel({
+  const materialData = await getMaterialByChannel(supabase, {
     channelId: message.channel.id,
   });
 
@@ -28,9 +20,8 @@ const handleItemDropV2 = async (message, channel) => {
   const itemList = []; // Empty array
   materialData.forEach((item) => {
     const obj = {
-      id: item.material.id,
-      name: item.material.name,
       emoji: item.material.emoji,
+      name: item.material.name,
       rarity: item.material.rarity.name,
       dropRate: item.material.rarity.drop_rate,
     };
@@ -40,6 +31,7 @@ const handleItemDropV2 = async (message, channel) => {
 
   // 2. Calculate Total Drop Probability for the Area
   const totalAreaDropProbability = await calculateTotalDropProbability(
+    supabase,
     itemList
   );
 
@@ -73,14 +65,21 @@ const handleItemDropV2 = async (message, channel) => {
 
     // 5. Insert item
     const itemAmount = 1;
-    let itemInserted = insertDropItems(message, selectedItem);
+    const itemInserted = await insertUserItem(
+      supabase,
+      message.author.id,
+      channelId,
+      selectedItem,
+      itemAmount,
+      new Date().toISOString()
+    );
 
-    // 6. Send reply
     if (itemInserted && channel) {
       console.log(
         `[${message.author.username}] Sending item drop announcement.`
       );
 
+      // 6. Send reply
       const itemDropEmbed = createBaseEmbed({
         color: 0xffd700,
         title: "✨ Found Item! ✨",
@@ -112,45 +111,10 @@ const handleItemDropV2 = async (message, channel) => {
   }
 };
 
-const insertDropItems = async (message, selectedItem, itemAmount = 1) => {
-  try {
-    const userItem = await getUserItem({
-      userId: message.author.id,
-      itemId: selectedItem.id,
-    });
-
-    let itemInserted = false;
-    if (userItem && userItem.length > 0) {
-      const oldAmount = userItem[0].amount;
-      const newAmount = userItem[0].amount + itemAmount;
-      itemInserted = await updateUserItem(
-        message.author,
-        userItem[0],
-        oldAmount,
-        newAmount
-      );
-    } else {
-      itemInserted = await insertUserItem(
-        message.author,
-        selectedItem,
-        itemAmount
-      );
-    }
-    return true;
-  } catch (error) {
-    return false;
-  }
-};
-
-const calculateTotalDropProbability = async (itemList) => {
+const calculateTotalDropProbability = async (supabase, itemList) => {
   let totalProbability = 0;
-  if (!supabase) {
-    console.warn(
-      "[calculateTotalDropProbability] Supabase client not available. Using default baseDropRate."
-    );
-  }
 
-  const configData = await getConfig({
+  const configData = await getConfig(supabase, {
     key: "base_drop_rate",
   });
 

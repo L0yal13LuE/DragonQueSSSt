@@ -1,5 +1,4 @@
 const { EmbedBuilder } = require('discord.js');
-const { supabase } = require('./supabaseClient');
 const {
     EXP_PER_CHARACTER, LEVELING_FACTOR, COOLDOWN_MILLISECONDS,
     MATERIAL_LIST, RARE_MATERIAL_LIST, POSSIBLE_MONSTERS
@@ -56,17 +55,17 @@ const processUserExp = (userId, username, currentExp, userLevel, expGained) => {
 /**
  * Selects monster details and calls createMonster to spawn it for the given date.
  */
-const spawnNewMonster = async (dateString) => {
+const spawnNewMonster = async (supabase, dateString) => {
     const chosenMonster = POSSIBLE_MONSTERS[Math.floor(Math.random() * POSSIBLE_MONSTERS.length)];
     const monsterHp = chosenMonster.baseHp * (LEVELING_FACTOR / 5);
 
-    return await createMonster(dateString, chosenMonster.name, Math.round(monsterHp));
+    return await createMonster(supabase, dateString, chosenMonster.name, Math.round(monsterHp));
 };
 
 /**
  * Handles item drop logic based on channel configuration.
  */
-const handleItemDrop = async (userId, channelId, message, announcementChannel) => {
+const handleItemDrop = async (supabase, userId, channelId, message, announcementChannel) => {
     // manual fixed drop rate on every channel
     // const dropConfig = { dropRate: 0.33, dropItems: MATERIAL_LIST };
     // if (!dropConfig) return;
@@ -83,7 +82,7 @@ const handleItemDrop = async (userId, channelId, message, announcementChannel) =
         // console.log('handleItemDrop > randomItem', randomItem);
         // const randomItem = possibleItems[Math.floor(Math.random() * possibleItems.length)];
         const itemAmount = 1;
-        const itemInserted = await insertUserItem(userId, channelId, randomItem, itemAmount, new Date().toISOString());
+        const itemInserted = await insertUserItem(supabase, userId, channelId, randomItem, itemAmount, new Date().toISOString());
 
         if (itemInserted && announcementChannel) {
             console.log(`[${message.author.username}] Sending item drop announcement.`);
@@ -107,17 +106,17 @@ const handleItemDrop = async (userId, channelId, message, announcementChannel) =
  * Checks total damage against max HP and updates monster status if defeated.
  * Returns true if the monster was defeated *by this check*, false otherwise.
  */
-const checkAndProcessMonsterDefeat = async (monsterDate, lastHitUserId, currentMonsterStateRef) => {
+const checkAndProcessMonsterDefeat = async (supabase, monsterDate, lastHitUserId, currentMonsterStateRef) => {
     if (!currentMonsterStateRef.current || !currentMonsterStateRef.current.is_alive) {
         return false;
     }
     const maxHp = currentMonsterStateRef.current.max_hp;
-    const totalDamage = await getTotalDamageDealt(monsterDate);
+    const totalDamage = await getTotalDamageDealt(supabase, monsterDate);
     console.log(`[${lastHitUserId}] Check Damage for ${monsterDate}: Total ${totalDamage} / ${maxHp}`);
 
     if (totalDamage >= maxHp) {
         console.log(`Defeat condition met for ${monsterDate}. Attempting to mark as defeated.`);
-        const updatedMonster = await markMonsterAsDefeated(monsterDate, lastHitUserId);
+        const updatedMonster = await markMonsterAsDefeated(supabase, monsterDate, lastHitUserId);
 
         if (updatedMonster) {
             console.log(`Monster ${monsterDate} was marked defeated by this check.`);
@@ -128,7 +127,7 @@ const checkAndProcessMonsterDefeat = async (monsterDate, lastHitUserId, currentM
             console.log(`Failed to mark ${monsterDate} as defeated (might already be done).`);
             // Re-sync state if it failed but DB shows it's dead
             if (currentMonsterStateRef.current.is_alive) {
-                const checkDbAgain = await getMonsterForDate(monsterDate);
+                const checkDbAgain = await getMonsterForDate(supabase, monsterDate);
                 if (checkDbAgain && !checkDbAgain.is_alive) {
                     console.log(`Syncing local state for ${monsterDate} to dead based on DB.`);
                     currentMonsterStateRef.current = { ...currentMonsterStateRef.current, ...checkDbAgain };
@@ -143,26 +142,26 @@ const checkAndProcessMonsterDefeat = async (monsterDate, lastHitUserId, currentM
 /**
  * Processes messages for EXP gain, leveling, item drops, and monster damage logging/checking.
  */
-const handleExpGain = async (message, userCooldowns, announcementChannel, itemDropChannel, currentMonsterStateRef) => {
+const handleExpGain = async (message, supabase, userCooldowns, announcementChannel, itemDropChannel, currentMonsterStateRef) => {
     const userId = message.author.id;
     const username = message.author.username;
     const currentMessageTimestamp = message.createdTimestamp;
 
-    const allowedChannelData = await getChannel({isGainExp: true});
+    const allowedChannelData = await getChannel(supabase, {isGainExp: true});
     const isChannelAllowed = allowedChannelData && allowedChannelData.some(channel => channel.id === message.channel.id);
 
     if (message.author.bot || !supabase || !isChannelAllowed) return;
 
     try {
-        let userData = await getUser(userId);
+        let userData = await getUser(supabase, userId);
         let userLevel = 0, userExp = 0;
 
         if (userData) {
             userLevel = userData.level; userExp = userData.current_exp;
-            if (userData.username !== username) await updateUsername(userId, username);
+            if (userData.username !== username) await updateUsername(supabase, userId, username);
         } else {
             userLevel = 1; userExp = 0;
-            const inserted = await insertUser(userId, username, userLevel, userExp, new Date(currentMessageTimestamp).toISOString());
+            const inserted = await insertUser(supabase, userId, username, userLevel, userExp, new Date(currentMessageTimestamp).toISOString());
             if (!inserted) return;
             userData = { level: userLevel, current_exp: userExp }; // Simulate userData for cooldown check
         }
@@ -175,7 +174,7 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
 
             if (expGainedFromMessage <= 0) {
                 // Still update username if needed, even with 0 EXP gain
-                if (userData && userData.username !== username) await updateUsername(userId, username);
+                if (userData && userData.username !== username) await updateUsername(supabase, userId, username);
                 return;
             }
 
@@ -187,10 +186,10 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
             // Use the reference object for current monster state
             if (currentMonsterStateRef.current && currentMonsterStateRef.current.is_alive && damageDealt > 0) {
                 console.log(`[${username}] Logging ${damageDealt} damage for monster ${currentMonsterStateRef.current.name}.`);
-                const logged = await logMonsterHit(currentMonsterStateRef.current.spawn_date, userId, username, damageDealt);
+                const logged = await logMonsterHit(supabase, currentMonsterStateRef.current.spawn_date, userId, username, damageDealt);
                 if (logged) {
                     // Pass the reference object to the check function
-                    monsterKilledThisCheck = await checkAndProcessMonsterDefeat(currentMonsterStateRef.current.spawn_date, userId, currentMonsterStateRef);
+                    monsterKilledThisCheck = await checkAndProcessMonsterDefeat(supabase, currentMonsterStateRef.current.spawn_date, userId, currentMonsterStateRef);
                 } else {
                     console.error(`[${username}] Failed to log hit for monster ${currentMonsterStateRef.current.spawn_date}.`);
                 }
@@ -199,7 +198,7 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
             const { newLevel, newExp, levelUpOccurred } = processUserExp(userId, username, userExp, userLevel, expGainedFromMessage);
             userCooldowns.set(userId, currentMessageTimestamp);
 
-            const updated = await updateUser(userId, {
+            const updated = await updateUser(supabase, userId, {
                 username: username, level: newLevel, current_exp: newExp,
                 last_online_timestamp: new Date(currentMessageTimestamp).toISOString()
             });
@@ -207,7 +206,7 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
             // Check the reference object's state after potential update by checkAndProcessMonsterDefeat
             if (monsterKilledThisCheck && currentMonsterStateRef.current && !currentMonsterStateRef.current.is_reward_announced) {
                 console.log(`Announcing defeat for ${currentMonsterStateRef.current.name} triggered by ${username}'s hit.`);
-                await announceMonsterDefeat(announcementChannel, currentMonsterStateRef.current);
+                await announceMonsterDefeat(supabase, announcementChannel, currentMonsterStateRef.current);
                 // Mark announced in the shared state immediately after announcement attempt
                 if (currentMonsterStateRef.current) currentMonsterStateRef.current.is_reward_announced = true;
             }
@@ -218,12 +217,12 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
                 console.error(`[${username}] Leveled up but failed DB update.`);
             }
 
-            // await handleItemDrop(userId, message.channel.id, message, itemDropChannel);
-            await handleItemDropV2(message, itemDropChannel);
+            // await handleItemDrop(supabase, userId, message.channel.id, message, itemDropChannel);
+            await handleItemDropV2(supabase, message, itemDropChannel);
 
         } else {
             // Update username even if on cooldown
-            if (userData && userData.username !== username) await updateUsername(userId, username);
+            if (userData && userData.username !== username) await updateUsername(supabase, userId, username);
         }
 
     } catch (error) {
@@ -235,7 +234,7 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
  * Checks the daily monster status every hour. Handles spawning, status verification, and cleanup.
  * Uses a reference object for currentMonsterState to allow modification.
  */
-const hourlyMonsterCheck = async (client, announcementChannel, currentMonsterStateRef) => {
+const hourlyMonsterCheck = async (supabase, client, announcementChannel, currentMonsterStateRef) => {
     if (!supabase || !announcementChannel) {
         console.log(`Hourly Check: Supabase (${!!supabase}) or Announcement Channel (${!!announcementChannel}) unavailable. Skipping.`);
         return;
@@ -249,26 +248,26 @@ const hourlyMonsterCheck = async (client, announcementChannel, currentMonsterSta
 
     try {
         // --- Check Yesterday's Monster ---
-        const yesterdaysMonster = await getMonsterForDate(yesterday);
+        const yesterdaysMonster = await getMonsterForDate(supabase, yesterday);
         if (yesterdaysMonster && yesterdaysMonster.is_alive) {
             console.warn(`Hourly Check: Found monster from yesterday (${yesterday}) still alive: ${yesterdaysMonster.name}. Marking defeated.`);
-            const updatedYesterdaysMonster = await markMonsterAsDefeated(yesterday, client.user.id); // Use bot ID
+            const updatedYesterdaysMonster = await markMonsterAsDefeated(supabase, yesterday, client.user.id); // Use bot ID
             if (updatedYesterdaysMonster) {
                 if (!updatedYesterdaysMonster.is_reward_announced) {
-                    await announceMonsterDefeat(announcementChannel, updatedYesterdaysMonster);
+                    await announceMonsterDefeat(supabase, announcementChannel, updatedYesterdaysMonster);
                 } else {
-                    await deleteMonsterHits(yesterday); // Already announced, just delete hits
+                    await deleteMonsterHits(supabase, yesterday); // Already announced, just delete hits
                 }
             } else {
                 console.error(`Failed to mark overdue monster ${yesterday} defeated.`);
             }
         } else if (yesterdaysMonster && !yesterdaysMonster.is_alive && yesterdaysMonster.is_reward_announced) {
             // Clean up hits if yesterday's monster is dead and announced
-            await deleteMonsterHits(yesterday);
+            await deleteMonsterHits(supabase, yesterday);
         }
 
         // --- Check Today's Monster ---
-        let monsterForToday = await getMonsterForDate(today);
+        let monsterForToday = await getMonsterForDate(supabase, today);
 
         if (!monsterForToday) {
             console.log("Hourly Check: No monster for today. Spawning...");
@@ -288,19 +287,19 @@ const hourlyMonsterCheck = async (client, announcementChannel, currentMonsterSta
         console.log(`Hourly Check: Found today's monster: ${currentMonsterStateRef.current.name} (DB Alive: ${currentMonsterStateRef.current.is_alive}, Announced: ${currentMonsterStateRef.current.is_reward_announced})`);
 
         if (currentMonsterStateRef.current.is_alive) {
-            const totalDamage = await getTotalDamageDealt(today);
+            const totalDamage = await getTotalDamageDealt(supabase, today);
             console.log(`Hourly Check (Today's Alive Monster): Total Damage ${totalDamage} / ${currentMonsterStateRef.current.max_hp}`);
             if (totalDamage >= currentMonsterStateRef.current.max_hp) {
                 console.log(`Hourly Check: Monster ${today} should be dead based on damage. Marking defeated.`);
                 // Pass the reference object here as well
-                const defeatedNow = await checkAndProcessMonsterDefeat(today, client.user.id, currentMonsterStateRef);
+                const defeatedNow = await checkAndProcessMonsterDefeat(supabase, today, client.user.id, currentMonsterStateRef);
                 if (defeatedNow && currentMonsterStateRef.current && !currentMonsterStateRef.current.is_reward_announced) {
                     console.log("Hourly Check: Announcing defeat after correction.");
-                    await announceMonsterDefeat(announcementChannel, currentMonsterStateRef.current);
+                    await announceMonsterDefeat(supabase, announcementChannel, currentMonsterStateRef.current);
                     if (currentMonsterStateRef.current) currentMonsterStateRef.current.is_reward_announced = true; // Mark announced in state
                 } else if (!defeatedNow) {
                     console.warn(`Hourly Check: Failed to mark ${today} defeated via check function (might be done). Re-fetching.`);
-                    currentMonsterStateRef.current = await getMonsterForDate(today); // Re-sync state
+                    currentMonsterStateRef.current = await getMonsterForDate(supabase, today); // Re-sync state
                 }
             } else {
                 console.log(`Hourly Check: Monster ${currentMonsterStateRef.current.name} correctly marked alive.`);
@@ -308,11 +307,11 @@ const hourlyMonsterCheck = async (client, announcementChannel, currentMonsterSta
         } else { // Dead in DB
             if (!currentMonsterStateRef.current.is_reward_announced) {
                 console.log("Hourly Check: Monster dead but unannounced. Announcing.");
-                await announceMonsterDefeat(announcementChannel, currentMonsterStateRef.current);
+                await announceMonsterDefeat(supabase, announcementChannel, currentMonsterStateRef.current);
                 if (currentMonsterStateRef.current) currentMonsterStateRef.current.is_reward_announced = true; // Mark announced in state
             } else {
                 console.log("Hourly Check: Monster dead and announced. Cleaning up hits.");
-                await deleteMonsterHits(today);
+                await deleteMonsterHits(supabase, today);
             }
         }
 

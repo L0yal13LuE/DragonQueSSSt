@@ -1,17 +1,16 @@
 // command/leaderboard.js
 
 // --- Required Libraries ---
-const { supabase } = require('../supabaseClient');
 const { EmbedBuilder } = require('discord.js');
 
 // --- Database Helper (Internal to this command) ---
 /**
  * Retrieves the top users based on level and EXP for the leaderboard.
+ * @param {object} supabase - The initialized Supabase client instance.
  * @param {number} limit - The maximum number of users to retrieve. Default is 10.
  * @returns {Promise<Array|null>} An array of user objects or null on error.
  */
-const getLeaderboardUsers = async (limit = 10) => {
-    if (!supabase) { console.error("[Leaderboard] Supabase client is missing in getLeaderboardUsers!"); return null; }
+const getLeaderboardUsers = async (supabase, limit = 10) => {
     // Assume supabase is valid if passed in
     try {
         const { data: users, error } = await supabase
@@ -35,10 +34,11 @@ const getLeaderboardUsers = async (limit = 10) => {
 /**
    * Handles the leaderboard command. using '!leaderboard'
    * display player level ranking
-   * @param {object} message - Discord message object.   
+   * @param {object} message - Discord message object.
+   * @param {object} supabase - The initialized Supabase client instance.
    * @param {object} client - The Discord client instance.
    */
-const handleLeaderboardCommand = async (message, client) => {
+const handleLeaderboardCommand = async (message, supabase, client) => {
     try {
 
         if (!supabase) {
@@ -51,7 +51,7 @@ const handleLeaderboardCommand = async (message, client) => {
         const topUsersLimit = 10;
 
         console.log(`[${username}] Requested leaderboard via external command.`); // Log difference
-        const leaderboardUsers = await getLeaderboardUsers(topUsersLimit);
+        const leaderboardUsers = await getLeaderboardUsers(supabase, topUsersLimit);
 
         if (leaderboardUsers === null) {
             message.reply('อุ๊ปส์! มีข้อผิดพลาดตอนดึงข้อมูลอันดับ ลองใหม่นะ');

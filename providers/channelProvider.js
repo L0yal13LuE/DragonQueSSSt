@@ -1,9 +1,7 @@
-const { supabase } = require('../supabaseClient');
 const { getChannelPair } = require("./channelPairProvider");
 
-const getChannel = async (filters = {}) => {
+const getChannel = async (supabase, filters = {}) => {
   try {
-    if (!supabase) { console.error("Supabase client not available in getChannel"); return null; }
     let query = supabase.from("channels").select(`id, name`);
 
     if ("channelId" in filters) {
@@ -30,9 +28,8 @@ const getChannel = async (filters = {}) => {
   }
 };
 
-const getChannelByArea = async (filters = {}) => {
+const getChannelByArea = async (supabase, filters = {}) => {
   try {
-    if (!supabase) { console.error("Supabase client not available in getChannelByArea"); return null; }
     let query = supabase.from("area_channel").select(`
         area:areas (
           name

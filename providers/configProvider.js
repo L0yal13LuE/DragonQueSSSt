@@ -1,8 +1,5 @@
-const { supabase } = require('../supabaseClient');
-
-const getConfig = async (filters = {}) => {
+const getConfig = async (supabase, filters = {}) => {
   try {
-    if (!supabase) { console.error("Supabase client not available in getConfig"); return null; }
     let query = supabase
       .from("configs")
       .select(`key, value`)
