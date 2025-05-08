@@ -181,7 +181,7 @@ const handleExpGain = async (message, supabase, userCooldowns, announcementChann
             console.log(`[${username}] Cooldown passed. Processing ${expGainedFromMessage} EXP.`);
 
             let monsterKilledThisCheck = false;
-            const damageDealt = Math.min(expGainedFromMessage, 100); // Cap damage per message
+            const damageDealt = Math.min(expGainedFromMessage, 50); // Cap damage per message
 
             // Use the reference object for current monster state
             if (currentMonsterStateRef.current && currentMonsterStateRef.current.is_alive && damageDealt > 0) {
