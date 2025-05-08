@@ -1,4 +1,5 @@
 const { supabase } = require("../supabaseClient");
+const { getChannelPair } = require("./channelPairProvider");
 
 const getMaterial = async (filters = {}) => {
   try {
@@ -64,6 +65,8 @@ const getMaterialByChannel = async (filters = {}, isall = false) => {
       `);
 
     if ("channelId" in filters) {
+      const pairChannelId = await getChannelPair(supabase, filters.channelId);
+      if (pairChannelId && pairChannelId > 0) filters.channelId = pairChannelId;
       query = query.eq("channel_id", filters.channelId);
     }
 

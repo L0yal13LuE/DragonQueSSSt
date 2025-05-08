@@ -1,4 +1,5 @@
 const { supabase } = require('../supabaseClient');
+const { getChannelPair } = require("./channelPairProvider");
 
 const getChannel = async (filters = {}) => {
   try {
@@ -6,6 +7,8 @@ const getChannel = async (filters = {}) => {
     let query = supabase.from("channels").select(`id, name`);
 
     if ("channelId" in filters) {
+      const pairChannelId = await getChannelPair(supabase, filters.channelId);
+      if (pairChannelId && pairChannelId > 0) filters.channelId = pairChannelId;
       query = query.eq("id", filters.channelId);
     }
 
@@ -45,6 +48,8 @@ const getChannelByArea = async (filters = {}) => {
     }
 
     if ("channelId" in filters) {
+      const pairChannelId = await getChannelPair(supabase, filters.channelId);
+      if (pairChannelId && pairChannelId > 0) filters.channelId = pairChannelId;
       query = query.eq("channel_id", filters.channelId);
     }
 
