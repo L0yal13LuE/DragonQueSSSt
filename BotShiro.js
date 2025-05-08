@@ -23,6 +23,7 @@ const { handleMaterialCommand } = require('./managers/materialManager.js');
 const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
 const { handleShopCommand, handlePressBuy } = require('./managers/shopManager.js');
 const { shopSettings } = require('./managers/shopWorkshop.js'); // shop setting getter from db
+const { handleCraftCommand } = require('./managers/craftManager.js'); 
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -136,6 +137,7 @@ client.on('messageCreate', async (message) => {
         if (command === 'rank' || command === 'level') commandHandlers.handleRankCommand(message, supabase);
         // else if (command === 'leaderboard') handleLeaderboardCommand(message, supabase, client); // TODO: still need to be implemented more
         else if (command === 'shop' && shopWorkShopSettings) handleShopCommand(message, shopWorkShopSettings);
+        else if (command === 'craft') handleCraftCommand(supabase, message.content, message, client);
         // else if (command === 'chat') commandHandlers.handleChatCommand(message, args); // useless ?
         else if (command === 'bag') commandHandlers.handleBagCommand(message, supabase);
         else if (command === 'monster') commandHandlers.handleMonsterCommand(message, supabase, currentMonsterStateRef.current); // Pass current state
