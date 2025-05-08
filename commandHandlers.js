@@ -1,13 +1,13 @@
 const { EmbedBuilder } = require('discord.js');
+const { supabase } = require('./supabaseClient');
 const { getUser, getUserItems, getMonsterForDate, getTotalDamageDealt } = require('./dbUtils');
 const { calculateNextLevelExp, getTodaysDateString } = require('./gameLogic');
 
 /**
  * Handles the '!rank' command with a fancier embed and progress bar. Works in any channel.
  * @param {object} message - Discord message object.
- * @param {object} supabase - Supabase client instance.
  */
-const handleRankCommand = async (message, supabase) => {
+const handleRankCommand = async (message) => {
     if (!supabase) {
         message.reply('Database issue! Can\'t check rank. 😥');
         return;
@@ -18,7 +18,7 @@ const handleRankCommand = async (message, supabase) => {
     const userAvatar = message.author.displayAvatarURL(); // Get user avatar URL
 
     try {
-        const userData = await getUser(supabase, userId);
+        const userData = await getUser(userId);
         if (userData) {
             const userLevel = userData.level;
             const userExp = userData.current_exp;
@@ -89,7 +89,7 @@ const handleChatCommand = async (message, args) => {
 /**
  * Handles the '!bag' command.
  */
-const handleBagCommand = async (message, supabase) => {
+const handleBagCommand = async (message) => {
     if (!supabase) {
         message.reply('Database issue! Can\'t open bag. 😥');
         return;
@@ -97,7 +97,7 @@ const handleBagCommand = async (message, supabase) => {
     const userId = message.author.id;
     const username = message.author.username;
     try {
-        const userItems = await getUserItems(supabase, userId);
+        const userItems = await getUserItems(userId);
         // Group items by name before displaying
         const groupedItems = (userItems || []).reduce((acc, item) => {
              const key = item.itemname;
@@ -129,7 +129,7 @@ const handleBagCommand = async (message, supabase) => {
 /**
  * Handles the '!monster' command to show today's monster status.
  */
-const handleMonsterCommand = async (message, supabase, currentMonsterState) => {
+const handleMonsterCommand = async (message, currentMonsterState) => {
     if (!supabase) {
         message.reply('Database issue! Can\'t check monster status. 😥');
         return;
@@ -140,7 +140,7 @@ const handleMonsterCommand = async (message, supabase, currentMonsterState) => {
         // Use cached state if available and for today, otherwise fetch
         let monsterData = currentMonsterState && currentMonsterState.spawn_date === today
             ? currentMonsterState
-            : await getMonsterForDate(supabase, today);
+            : await getMonsterForDate(today);
 
         if (monsterData) {
             let status = monsterData.is_alive ? "⚔️" : "☠️";
@@ -148,7 +148,7 @@ const handleMonsterCommand = async (message, supabase, currentMonsterState) => {
             let color = monsterData.is_alive ? 0xFF4500 : 0x32CD32; // Orange if alive, Green if dead
 
             if (monsterData.is_alive) {
-                const totalDamage = await getTotalDamageDealt(supabase, today);
+                const totalDamage = await getTotalDamageDealt(today);
                 const remainingHp = Math.max(0, monsterData.max_hp - totalDamage);
                 remainingHpText = remainingHp.toString();
                 if (remainingHp <= 0) {

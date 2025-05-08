@@ -1,7 +1,8 @@
+const { supabase } = require('./supabaseClient');
 /**
  * Retrieves user data (level, exp, etc.) from the 'users' table.
  */
-const getUser = async (supabase, userId) => {
+const getUser = async (userId) => {
     if (!supabase) return null;
     try {
         const { data: userData, error } = await supabase.from('users').select('*').eq('id', userId).single();
@@ -15,7 +16,7 @@ const getUser = async (supabase, userId) => {
 /**
  * Inserts a new user record into the 'users' table.
  */
-const insertUser = async (supabase, userId, username, level, currentExp, timestamp) => {
+const insertUser = async (userId, username, level, currentExp, timestamp) => {
     if (!supabase) return false;
     try {
         const { error } = await supabase.from('users').insert([{ id: userId, username: username, level: level, current_exp: currentExp, last_online_timestamp: timestamp }]);
@@ -28,7 +29,7 @@ const insertUser = async (supabase, userId, username, level, currentExp, timesta
 /**
  * Updates an existing user's data in the 'users' table.
  */
-const updateUser = async (supabase, userId, dataToUpdate) => {
+const updateUser = async (userId, dataToUpdate) => {
     if (!supabase) return false;
     try {
         const { error } = await supabase.from('users').update(dataToUpdate).eq('id', userId);
@@ -41,7 +42,7 @@ const updateUser = async (supabase, userId, dataToUpdate) => {
 /**
  * Updates only the username for a user.
  */
-const updateUsername = async (supabase, userId, username) => {
+const updateUsername = async (userId, username) => {
     if (!supabase) return false;
     try {
         const { error } = await supabase.from('users').update({ username: username }).eq('id', userId);
@@ -54,7 +55,7 @@ const updateUsername = async (supabase, userId, username) => {
 /**
  * Inserts or updates (upserts) a user's item count in 'user_item'.
  */
-const insertUserItem = async (supabase, userid, channelid, item, itemamount, timestamp) => {
+const insertUserItem = async (userid, channelid, item, itemamount, timestamp) => {
     if (!supabase) return false;
     try {
         const { data: existingItem, error: fetchError } = await supabase
@@ -87,7 +88,7 @@ const insertUserItem = async (supabase, userid, channelid, item, itemamount, tim
 /**
  * Retrieves all items for a specific user.
  */
-const getUserItems = async (supabase, userId) => {
+const getUserItems = async (userId) => {
     if (!supabase) return null;
     try {
         const { data: userItems, error } = await supabase.from('user_item').select('*').eq('userid', userId);
@@ -101,7 +102,7 @@ const getUserItems = async (supabase, userId) => {
 /**
  * Fetches the monster record for a specific date from 'event_monster'.
  */
-const getMonsterForDate = async (supabase, dateString) => {
+const getMonsterForDate = async (dateString) => {
     if (!supabase) return null;
     try {
         const { data, error } = await supabase
@@ -124,7 +125,7 @@ const getMonsterForDate = async (supabase, dateString) => {
 /**
  * Creates a new monster entry in 'event_monster'.
  */
-const createMonster = async (supabase, dateString, name, maxHp) => {
+const createMonster = async (dateString, name, maxHp) => {
     if (!supabase) return null;
     try {
         const monsterData = {
@@ -156,7 +157,7 @@ const createMonster = async (supabase, dateString, name, maxHp) => {
 /**
  * Logs a player's hit against a monster in 'event_monster_hit'.
  */
-const logMonsterHit = async (supabase, monsterDate, userId, username, damage) => {
+const logMonsterHit = async (monsterDate, userId, username, damage) => {
     if (!supabase) return false;
     try {
         const { error } = await supabase
@@ -185,7 +186,7 @@ const logMonsterHit = async (supabase, monsterDate, userId, username, damage) =>
  * Calls the Supabase RPC function 'calculate_total_damage' to sum damage from 'event_monster_hit'.
  * Make sure the RPC function exists in your Supabase project!
  */
-const getTotalDamageDealt = async (supabase, monsterDate) => {
+const getTotalDamageDealt = async (monsterDate) => {
     if (!supabase) return 0;
     try {
         // Assumes an RPC function named 'calculate_total_damage' exists in Supabase
@@ -207,7 +208,7 @@ const getTotalDamageDealt = async (supabase, monsterDate) => {
 /**
  * Updates the monster's status in the 'event_monster' table when it's defeated.
  */
-const markMonsterAsDefeated = async (supabase, monsterDate, killerUserId, finalHp = 0) => {
+const markMonsterAsDefeated = async (monsterDate, killerUserId, finalHp = 0) => {
     if (!supabase) return null;
     try {
         const updateData = {
@@ -243,7 +244,7 @@ const markMonsterAsDefeated = async (supabase, monsterDate, killerUserId, finalH
 /**
  * Marks the monster's reward as announced in the 'event_monster' table.
  */
-const markRewardAnnounced = async (supabase, dateString) => {
+const markRewardAnnounced = async (dateString) => {
     if (!supabase) return false;
     try {
         const { error } = await supabase
@@ -267,10 +268,9 @@ const markRewardAnnounced = async (supabase, dateString) => {
  * Deletes all hit records for a specific monster spawn date from 'event_monster_hit'.
  * @param {object} supabase - The Supabase client instance.
  * @param {string} monsterDate - The spawn date 'YYYY-MM-DD' of the monster whose hits should be deleted.
- * @returns {Promise<boolean>} True if deletion was successful or no rows needed deleting, false on error.
- */
-const deleteMonsterHits = async (supabase, monsterDate) => {
-    if (!supabase) { console.error(`[DeleteHits] Supabase client unavailable.`); return false; }
+ * @returns {Promise<boolean>} True if deletion was successful or no rows needed deleting, false on error. */
+const deleteMonsterHits = async (monsterDate) => {
+    if (!supabase) { console.error(`[DeleteHits] Supabase client unavailable (likely not initialized).`); return false; }
     console.log(`[DeleteHits] Attempting deletion for date: '${monsterDate}' (Type: ${typeof monsterDate})`);
 
     try {
@@ -315,7 +315,7 @@ const deleteMonsterHits = async (supabase, monsterDate) => {
 /**
  * get shop setting
  */
-const getShop = async (supabase, channelId) => {
+const getShop = async (channelId) => {
     if (!supabase) return null;
     try {
         const { data: shopData, error } = await supabase.from('shops')
@@ -342,7 +342,7 @@ const getShop = async (supabase, channelId) => {
 /**
  * Retrieves all items in shop
  */
-const getShopItems = async (supabase, shopId) => {
+const getShopItems = async (shopId) => {
     if (!supabase) return null;
     try {
         const { data: shopItems, error } = await supabase.from('shop_items')
