@@ -147,9 +147,9 @@ const updateUserItem = async (user, item, oldAmount, newAmount) => {
       return false;
     }
     console.log(
-      `User ${user.id} gained ${newAmount - oldAmount} x ${item.material.name} ${
-        item.material.emoji
-      }. New total: ${newAmount}.`
+      `User ${user.id} gained ${newAmount - oldAmount} x ${
+        item.material.name
+      } ${item.material.emoji}. New total: ${newAmount}.`
     );
     return true;
   } catch (error) {
