@@ -1,6 +1,7 @@
+const { supabase } = require('../supabaseClient');
 const { getShop, getShopItems } = require('./../dbUtils');
 
-const shopSettings = async (supabase, channelId) => {
+const shopSettings = async (channelId) => {
     // define default value
     let title = 'Master Shiro\'s Shop';
     let description = 'Welcome, See what wares I have for sale';
@@ -10,7 +11,8 @@ const shopSettings = async (supabase, channelId) => {
     let itemsForSellMaster = [];
     
     // Get shop data by channel id
-    const shopData = await getShop(supabase, channelId);
+    if (!supabase) { console.error("[shopSettings] Supabase client not available."); return null; } // Or handle differently
+    const shopData = await getShop(channelId);
     
     // There was a bug in your console.log - fixed it to show the shop data
     // console.log('Shop Data:', shopData);
@@ -23,7 +25,7 @@ const shopSettings = async (supabase, channelId) => {
         footer = shopData.footer || footer;
         
         // Get items in this shop
-        const shopItems = await getShopItems(supabase, shopData.id);
+        const shopItems = await getShopItems(shopData.id);
         
         // Check if shopItems is not null and has items
         if (shopItems && shopItems.length > 0) {
