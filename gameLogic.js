@@ -272,7 +272,7 @@ const hourlyMonsterCheck = async (client, announcementChannel, currentMonsterSta
 
         if (!monsterForToday) {
             console.log("Hourly Check: No monster for today. Spawning...");
-            const newMonster = await spawnNewMonster(supabase, today);
+            const newMonster = await spawnNewMonster(today);
             if (newMonster) {
                 currentMonsterStateRef.current = newMonster; // Update shared state
                 announceMonsterSpawn(announcementChannel, currentMonsterStateRef.current);
