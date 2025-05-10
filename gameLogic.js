@@ -11,6 +11,7 @@ const { handleLevelUpAnnouncement, announceMonsterSpawn, announceMonsterDefeat }
 // const { handleDropByLocation } = require('./dropItem.js'); // don't get exp on these channel
 const { getChannel } = require('./providers/channelProvider');
 const { handleItemDropV2 } = require('./managers/itemManager.js');
+const { getMonsters } = require('./providers/monsterProvider');
 
 /**
  * Gets the current UTC date as a string 'YYYY-MM-DD'.
@@ -52,7 +53,15 @@ const processUserExp = (userId, username, currentExp, userLevel, expGained) => {
  * Selects monster details and calls createMonster to spawn it for the given date.
  */
 const spawnNewMonster = async (dateString) => {
-    const chosenMonster = constants.POSSIBLE_MONSTERS[Math.floor(Math.random() * constants.POSSIBLE_MONSTERS.length)];
+
+    const allMonsters = await getMonsters();
+
+    if (!allMonsters || allMonsters.length === 0) {
+        console.error("[GameLogic] spawnNewMonster: No monsters found in the database to choose from. Cannot spawn a new monster.");
+        return null; // Indicate that no monster could be spawned
+    }
+
+    const chosenMonster = allMonsters[Math.floor(Math.random() * allMonsters.length)];
     const monsterHp = chosenMonster.baseHp * (constants.LEVELING_FACTOR / 5);
 
     return await createMonster(dateString, chosenMonster.name, Math.round(monsterHp));
