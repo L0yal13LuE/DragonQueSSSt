@@ -24,6 +24,7 @@ const { handleMaterialCommand } = require('./managers/materialManager.js');
 const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
 const { handleShopCommand, handlePressBuy } = require('./managers/shopManager.js');
 const { shopSettings } = require('./managers/shopWorkshop.js'); // shop setting getter from db
+const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -101,6 +102,56 @@ client.once('ready', async () => {
     //     console.log(`[Shop] not found: ${shopWorkShopSettings}`);
     // }
     
+    // Load dynamic configurations like EXP_PER_CHARACTER and COOLDOWN_MILLISECONDS
+    if (supabase) {
+        console.log("[Config] Loading dynamic configurations from database...");
+        try {
+            const expCooldownConfig = await getConfig({ key: "exp_cooldown" });
+            if (expCooldownConfig && expCooldownConfig.length > 0 && expCooldownConfig[0].value) {
+                const newCooldown = parseInt(expCooldownConfig[0].value);
+                if (!isNaN(newCooldown)) {
+                    CONSTANTS.COOLDOWN_MILLISECONDS = newCooldown;
+                    console.log(`[Config] EXP Cooldown successfully updated to: ${CONSTANTS.COOLDOWN_MILLISECONDS}ms`);
+                } else {
+                    console.warn(`[Config] Invalid value for exp_cooldown from DB: "${expCooldownConfig[0].value}". Using default: ${CONSTANTS.COOLDOWN_MILLISECONDS}ms`);
+                }
+            } else {
+                console.log(`[Config] exp_cooldown not found or empty in DB. Using default: ${CONSTANTS.COOLDOWN_MILLISECONDS}ms`);
+            }
+
+            const expBaseConfig = await getConfig({ key: "exp_base" });
+            if (expBaseConfig && expBaseConfig.length > 0 && expBaseConfig[0].value) {
+                const newExpBase = parseFloat(expBaseConfig[0].value);
+                if (!isNaN(newExpBase)) {
+                    CONSTANTS.EXP_PER_CHARACTER = newExpBase;
+                    console.log(`[Config] EXP per character successfully updated to: ${CONSTANTS.EXP_PER_CHARACTER}`);
+                } else {
+                    console.warn(`[Config] Invalid value for exp_base from DB: "${expBaseConfig[0].value}". Using default: ${CONSTANTS.EXP_PER_CHARACTER}`);
+                }
+            } else {
+                console.log(`[Config] exp_base not found or empty in DB. Using default: ${CONSTANTS.EXP_PER_CHARACTER}`);
+            }
+
+            const expLevelingFactorConfig = await getConfig({ key: "exp_leveling_factor" }); // Use a dedicated key
+            if (expLevelingFactorConfig && expLevelingFactorConfig.length > 0 && expLevelingFactorConfig[0].value) {
+                const newLevelingFactor = parseInt(expLevelingFactorConfig[0].value); // Parse as integer
+                if (!isNaN(newLevelingFactor)) {
+                    CONSTANTS.LEVELING_FACTOR = newLevelingFactor;
+                    console.log(`[Config] Leveling Factor successfully updated to: ${CONSTANTS.LEVELING_FACTOR}`);
+                } else {
+                    console.warn(`[Config] Invalid value for exp_leveling_factor from DB: "${expLevelingFactorConfig[0].value}". Using default: ${CONSTANTS.LEVELING_FACTOR}`);
+                }
+            } else {
+                console.log(`[Config] exp_leveling_factor not found or empty in DB. Using default: ${CONSTANTS.LEVELING_FACTOR}`);
+            }
+        } catch (error) {
+            console.error("[Config] Error loading dynamic configurations from database:", error);
+            console.log(`[Config] Critical load failure. Using default values for EXP Cooldown (${CONSTANTS.COOLDOWN_MILLISECONDS}ms), EXP per character (${CONSTANTS.EXP_PER_CHARACTER}), and Leveling Factor (${CONSTANTS.LEVELING_FACTOR}).`);
+        }
+    } else {
+        console.warn("[Config] Supabase not available at startup. Using default values for dynamic configurations.");
+    }
+
     // Setup Hourly Monster Check
     if (supabase && announcementChannel) {
         console.log("Setting up hourly monster check...");
@@ -121,15 +172,39 @@ client.on('messageCreate', async (message) => {
         const args = message.content.slice(CONSTANTS.COMMAND_PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        if (command === 'rank' || command === 'level') commandHandlers.handleRankCommand(message);
-        // else if (command === 'leaderboard') handleLeaderboardCommand(message, client); // TODO: still need to be implemented more
-        else if (command === 'shop' && shopWorkShopSettings) handleShopCommand(message, shopWorkShopSettings);
-        // else if (command === 'chat') commandHandlers.handleChatCommand(message, args); // useless ?
-        else if (command === 'bag') commandHandlers.handleBagCommand(message);
-        else if (command === 'monster') commandHandlers.handleMonsterCommand(message, currentMonsterStateRef.current); // Pass current state
-        // else if (command === 'spin') handleSpinCommand(message); // Keep using the imported manager
-        else if (command === 'material') handleMaterialCommand(message); // Keep using the imported manager
-        // Add other commands here
+                switch (command) {
+            case 'rank':
+            case 'level':
+                commandHandlers.handleRankCommand(message);
+                break;
+            // case 'leaderboard': // TODO: still need to be implemented more
+            //     handleLeaderboardCommand(message, client);
+            //     break;
+            case 'shop':
+                if (shopWorkShopSettings) {
+                    handleShopCommand(message, shopWorkShopSettings);
+                } else {
+                    // Optionally, send a message if the shop isn't available/configured
+                    // message.reply("The shop is currently unavailable.");
+                }
+                break;
+            // case 'chat': // useless ?
+            //     commandHandlers.handleChatCommand(message, args);
+            //     break;
+            case 'bag':
+                commandHandlers.handleBagCommand(message);
+                break;
+            case 'monster':
+                commandHandlers.handleMonsterCommand(message, currentMonsterStateRef.current); // Pass current state
+                break;
+            case 'material':
+                handleMaterialCommand(message); // Keep using the imported manager
+                break;
+            // Add other commands here with their respective 'case' and 'break;'
+            // default:
+            //     // Optionally handle unknown commands
+            //     // message.reply(`Unknown command: ${command}`);
+        }
     }
     // Non-Command Message Processing
     else {

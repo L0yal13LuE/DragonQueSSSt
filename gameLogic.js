@@ -1,9 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const { supabase } = require('./supabaseClient');
-const {
-    EXP_PER_CHARACTER, LEVELING_FACTOR, COOLDOWN_MILLISECONDS,
-    MATERIAL_LIST, RARE_MATERIAL_LIST, POSSIBLE_MONSTERS
-} = require('./constants');
+const constants = require('./constants'); // Changed import style
 const {
     getUser, insertUser, updateUser, updateUsername, insertUserItem,
     getMonsterForDate, createMonster, logMonsterHit, getTotalDamageDealt,
@@ -11,9 +8,7 @@ const {
 } = require('./dbUtils');
 const { handleLevelUpAnnouncement, announceMonsterSpawn, announceMonsterDefeat } = require('./announcements');
 
-const { disAllowChannelArray } = require('./disAllowChannelArray.js'); // TODO remove (still have to keep it cause COCO still use this)
-const { handleDropByLocation } = require('./dropItem.js'); // don't get exp on these channel
-
+// const { handleDropByLocation } = require('./dropItem.js'); // don't get exp on these channel
 const { getChannel } = require('./providers/channelProvider');
 const { handleItemDropV2 } = require('./managers/itemManager.js');
 
@@ -30,7 +25,7 @@ const getTodaysDateString = () => {
 const calculateNextLevelExp = (currentLevel) => {
     if (currentLevel === 0) return 50;
     const nextLevel = currentLevel + 1;
-    return (currentLevel * LEVELING_FACTOR) * nextLevel;
+    return (currentLevel * constants.LEVELING_FACTOR) * nextLevel;
 };
 
 /**
@@ -57,8 +52,8 @@ const processUserExp = (userId, username, currentExp, userLevel, expGained) => {
  * Selects monster details and calls createMonster to spawn it for the given date.
  */
 const spawnNewMonster = async (dateString) => {
-    const chosenMonster = POSSIBLE_MONSTERS[Math.floor(Math.random() * POSSIBLE_MONSTERS.length)];
-    const monsterHp = chosenMonster.baseHp * (LEVELING_FACTOR / 5);
+    const chosenMonster = constants.POSSIBLE_MONSTERS[Math.floor(Math.random() * constants.POSSIBLE_MONSTERS.length)];
+    const monsterHp = chosenMonster.baseHp * (constants.LEVELING_FACTOR / 5);
 
     return await createMonster(dateString, chosenMonster.name, Math.round(monsterHp));
 };
@@ -157,6 +152,7 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
         let userData = await getUser(userId);
         let userLevel = 0, userExp = 0;
 
+        // EXP_PER_CHARACTER and COOLDOWN_MILLISECONDS are now loaded from constants, which are updated at startup
         if (userData) {
             userLevel = userData.level; userExp = userData.current_exp;
             if (userData.username !== username) await updateUsername(userId, username);
@@ -170,8 +166,8 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
         const lastExpTimestamp = userCooldowns.get(userId) || 0;
         const timeSinceLastExp = currentMessageTimestamp - lastExpTimestamp;
 
-        if (timeSinceLastExp >= COOLDOWN_MILLISECONDS) {
-            const expGainedFromMessage = message.content.length * EXP_PER_CHARACTER;
+        if (timeSinceLastExp >= constants.COOLDOWN_MILLISECONDS) {
+            const expGainedFromMessage = message.content.length * constants.EXP_PER_CHARACTER;
 
             if (expGainedFromMessage <= 0) {
                 // Still update username if needed, even with 0 EXP gain
