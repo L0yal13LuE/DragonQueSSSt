@@ -1,331 +1,206 @@
 // managers/craftManager.js
-const { EmbedBuilder } = require('discord.js');
 
-/**
- * Retrieves a craft command from the database that matches the given command.
- * The query first looks for a matching command, then checks if the command is active.
- * If an error occurs, it is logged and false is returned.
- * If the command is found, the entire craft object is returned. Otherwise, false is returned.
- * @param {object} supabase - The Supabase client instance for querying the database.
- * @param {string} command - The command to search for in the database.
- * @returns {Promise<object|boolean>} - The craft object if found, or false if not found or an error occurred.
- */
-const fetchCraftCommand = async (supabase, command) => {
-    const { data: craftMatched, error } = await supabase
-        .from('crafts')
-        .select('*')
-        .eq('command', command)
-        .eq('is_active', true)
-        .single();
+// --- Required Libraries ---
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
+const { createBaseEmbed } = require("./embedManager");
+const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/materialProvider");
 
-    if (error) {
-        console.error("Supabase query error (fetchCraftCommand):", error);
-        return false;
-    }
+// handle when user run !craft command
+const handleCraftCommand = async (message, args) => {
+    try {
+        // --- Create Embed with Items ---
+        // Create a base embed with title, description, thumbnail, and footer
+        const baseEmbed = createBaseEmbed({
+            color: '#0099ff',
+            title: args.title,
+            description: args.description,
+            //thumbnail: args.thumbnail,
+            //footer: { 'text': args.footer } : null,
+        });
 
-    // console.log(`typing ${command} > fetchCraftCommand > found`, craftMatched);
+        // console.log("args.items: ", args.items);
 
-    if (craftMatched && craftMatched.id) return craftMatched;
+        // Add items as fields to the embed using the new parameters
+        const lettesArray = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+        args.items.forEach((item, index) => {
+            // Add the item as a field to the embed
+            let itemLetter = lettesArray[index];
+            const materialRowArray = item.materials.map(row => `${row.materials.emoji} ${row.materials.name} x ${row.amount}`);
+            // main row
+            const mainrow = {
+                name: `:regional_indicator_${itemLetter.toLowerCase()}: — ${item.emoji} ${item.name}`, // Combine emoji and item name for the field name
+                value: `Required: ${materialRowArray.join(", ")}`, // Display the price in the value
+                inline: false // Set to true to display items side-by-side if they fit (up to 3 per row usually)
+            };
+            baseEmbed.addFields(mainrow);
+        });
 
-    return false;
-}
+        // --- Create Buttons for each item ---
+        const rows = [];
+        let currentRow = new ActionRowBuilder();
 
-/**
- * Fetches the materials required for a specific craft by its ID.
- * Queries the 'craft_materials' table to retrieve active materials associated with the given craft ID.
- * Each fetched material includes its ID, material ID, amount, and emoji.
- * 
- * @param {object} supabase - The Supabase client instance for querying the database.
- * @param {number} craftId - The ID of the craft for which materials are to be fetched.
- * @returns {Promise<Array|boolean>} - Returns an array of materials if successful, or false if an error occurs.
- */
-const fetchCraftMaterials = async (supabase, craftId) => {
-    console.log("Fetching craft materials for craft ID:", craftId);
+        args.items.forEach((item, index) => {
+            const uniqueItemId = `${item.name}`;
+            let itemLetter = lettesArray[index];
+            const button = new ButtonBuilder()
+                // Create a unique custom ID for the button, based on the item name
+                // .setCustomId(`craft_${uniqueItemId.replace(/\s+/g, '_')}`)
+                // .setLabel(`Buy ${item.emoji} ${item.name}`) // Button text
+                .setCustomId(`craft_${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}`)
+                .setLabel(itemLetter) // Button text
+                .setStyle(ButtonStyle.Primary); // Use a primary button style
+            // .setStyle(ButtonStyle.Secondary); // Use a primary button style
 
-    const { data: dataArray, error } = await supabase
-        .from('craft_materials')
-        .select('id, material_id, amount, materials(emoji, name)')
-        .eq('craft_id', craftId)
-        .eq('is_active', true)
-        .eq('materials.is_active', true);
+            // Add button to the current row
+            currentRow.addComponents(button);
 
-    if (error) {
-        console.error("Supabase query error (fetchCraftMaterials):", error);
-        return false;
-    }
-
-    console.log(`Fetched ${dataArray.length} materials for craft ID: ${craftId}`);
-    return dataArray;
-}
-
-/**
- * Retrieves all items for a specific user that match the given material names.
- * Queries the 'user_item' table to retrieve active items associated with the given user ID and material names.
- * Each fetched item includes its ID, user ID, emoji, name, and amount.
- * If there are multiple items with the same name, they will be merged by summing their amounts and keeping the highest ID.
- * The resulting array of items is returned.
- * 
- * @param {object} supabase - The Supabase client instance for querying the database.
- * @param {number} userId - The ID of the user for which items are to be fetched.
- * @param {Array<string>} materialNames - An array of material names for which items are to be fetched.
- * @returns {Promise<Array|boolean>} - Returns an array of items if successful, or false if an error occurs.
- */
-const fetchUserItemsByMaterialIds = async (supabase, userId, materialNames) => {
-    if (!materialNames.length) return [];
-
-    const getData = async (id, names) => {
-        const { data: userItems, error } = await supabase
-            .from('user_item')
-            .select('id, userid, itememoji, itemname, itemamount')
-            .eq('userid', id)
-            .gt('itemamount', 0)
-            .in('itemname', names);
-        if (error) {
-            console.error(`Error fetching user items for user ${id} with material name ${names.join(', ')}:`, error.message);
-            return null;
-        }
-        return userItems;
-    }
-
-    const updateUserItem = async (userid, items) => {
-        if (items.length <= 0) return false;
-        const itemMap = {};
-        let needProcess = false;
-        items.forEach((item) => {
-            if (itemMap[item.itemname]) {
-                itemMap[item.itemname].itemamount += item.itemamount;
-                needProcess = true;
-            } else {
-                itemMap[item.itemname] = item;
+            // If the current row has 5 buttons or it's the last item, push the row and start a new one
+            if (currentRow.components.length === 5 || index === args.items.length - 1) {
+                rows.push(currentRow);
+                if (index < args.items.length - 1) { // Don't create a new row if it's the very last item
+                    currentRow = new ActionRowBuilder();
+                }
             }
         });
 
-        const updateAmount = async (id, amount) => {
-            await supabase
-                .from('user_item')
-                .update({ itemamount: amount })
-                .eq('id', id)
-                .eq('userid', userid);
-        }
-
-        if (needProcess) {
-            items.forEach(async (item) => {
-                if (itemMap[item.itemname] && item.id !== itemMap[item.itemname].id) {
-                    await updateAmount(item.id, 0);
-                } else {
-                    await updateAmount(itemMap[item.itemname].id, itemMap[item.itemname].itemamount);
-                }
-            });
-        }
-    }
-
-    try {
-        const userItems = await getData(userId, materialNames);
-        // console.log("fetchUserItemsByMaterialIds > userItems", userItems);
-        if (userItems && userItems.length > 0) {
-            await updateUserItem(userId, userItems);
-        }
-        const newUpdatedItems = await getData(userId, materialNames);
-        // console.log("fetchUserItemsByMaterialIds > newUpdatedItems", newUpdatedItems);
-        return newUpdatedItems;
-
+        await message.reply({
+            embeds: [baseEmbed],
+            components: rows, // Attach the action rows containing the buttons
+        });
     } catch (error) {
-        console.error(`Unexpected error fetching user items for user ${userId} with material name ${materialNames.join(', ')}:`, error);
-        return null;
-    }
-};
-
-/**
- * Retrieves the materials required for a specific craft command and the user's owned materials associated with the required materials.
- * 
- * @param {object} supabase - The Supabase client instance for querying the database.
- * @param {object} message - The Discord message object containing the user ID.
- * @param {object} craftCommand - The craft command object containing the ID.
- * @returns {Promise<object>} - Returns an object with the required materials and the user's owned materials.
- */
-const fetchCraftItemsRequired = async (supabase, message, craftCommand) => {
-    // fetch requred materials
-    const materials = await fetchCraftMaterials(supabase, craftCommand.id);
-    // fetch user materials
-    const materialNames = materials.map(item => item.materials.name);
-    const userMaterials = await fetchUserItemsByMaterialIds(supabase, message.author.id, materialNames);
-    return {
-        materials,
-        userMaterials,
+        console.error('Error sending shop embed with buttons:', error);
+        message.channel.send('Could not display the shop at this time.');
     }
 }
 
-/**
- * Retrieves a single material by ID.
- * Queries the 'materials' table to retrieve the material associated with the given ID.
- * The material is expected to be active.
- * 
- * @param {object} supabase - The Supabase client instance for querying the database.
- * @param {number} material_id - The ID of the material to fetch.
- * @returns {Promise<object|boolean>} - Returns the material object if successful, or false if an error occurs.
- */
-const fetchNewCraftItems = async (supabase, material_id) => {
-    const { data: dataItem, error } = await supabase
-        .from('materials')
-        .select('*')
-        .eq('id', material_id)
-        .eq('is_active', true) // -> production
-        .single();
+// handle button interactions when user click on button from using !craft command
+const handleCraftButtonClick = async (interaction, args) => {
+    // Only process button interactions
+    if (!interaction.isButton()) return;
 
-    if (error) {
-        console.error("Supabase query error (fetchNewCraftItems):", error);
-        return false;
-    }
+    const userId = interaction.user.id;
+    const username = interaction.user.username;
 
-    return (dataItem && dataItem.id) ? dataItem : false;
-}
+    // Check if the button custom ID starts with 'craft_', indicating a shop purchase attempt
+    if (interaction.customId.startsWith('craft_')) {
 
-/**
- * Handles a craft command from a user.
- * Determines if the command is for checking or crafting based on the presence of 'start' at the end.
- * If the command is for checking, it fetches the required materials and the user's owned materials and sends a message to the channel with the requirements.
- * If the command is for crafting, it deducts the required materials from the user's inventory and adds the new craft item to the user's inventory.
- * If the user does not have enough materials, it sends an error message to the channel.
- * If the user successfully crafts the item, it sends a success message to the channel.
- * @param {object} supabase - The Supabase client instance for querying the database.
- * @param {string} command - The craft command issued by the user (e.g. '!craft fco-a' or '!craft fco-a start')
- * @param {object} message - The Discord message object containing the user ID and channel ID.
- * @param {object} client - The Discord client instance.
- */
-const handleCraftCommand = async (supabase, command, message, client) => {
-    const userID = message.author.id;
+        // Defer the reply to prevent interaction timeout, reply is only visible to the user
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+        // Extract the item 
+        const itemToBuyNameA = interaction.customId.replace('craft_', '').replace(/_/g, '');
+        const itemToBuyName = itemToBuyNameA.split('@')[0];
+        const itemToCraft = args.items.find(item => item.letter === itemToBuyName);
 
-    // Determine if the command is for checking or crafting
-    const isCraftingCommand = command.toLowerCase().endsWith('start');
-    const baseCommand = isCraftingCommand ? command.slice(0, -6).trim() : command.trim();
-
-    // find the craft that matches the command
-    const craftCommand = await fetchCraftCommand(supabase, baseCommand.toLowerCase());
-
-    if (isCraftingCommand) {
-        // Logic for when user wants to start crafting
-        console.log(`Crafting command issued: ${baseCommand}`);
-
-        // new item
-        const newItem = await fetchNewCraftItems(supabase, craftCommand.material_id);
-
-        // Add crafting logic here
-        const { materials, userMaterials } = await fetchCraftItemsRequired(supabase, message, craftCommand);
-
-        // double check if user already got eveything they need
-        // deduct each material from user_item table
-        // add new craft item to user_item table
-
-        if (newItem && materials && materials.length > 0 && userMaterials && userMaterials.length > 0) {
-
-            // loop through materials and deduct from user's inventory
-            materials.forEach(material => {
-                const currentOwnedOfMaterial = userMaterials.find(userMaterial => userMaterial.itemname === material.materials.name);
-                if (currentOwnedOfMaterial.itemamount < material.amount) {
-                    console.error(`User ${message.author.id} does not have enough ${material.materials.name} to craft ${craftCommand.title}`);
-                    return;
-                }
-
-                // deduct the material from user's inventory
-                const newUpdateAmount = currentOwnedOfMaterial.itemamount - material.amount;
-                // const { error: updateError } = supabase.from('user_item')
-                //     .update({ itemamount: newUpdateAmount })
-                //     .eq('id', currentOwnedOfMaterial.id)
-                //     .eq('userid', userID);
-
-                // if (updateError) {
-                //     console.error(`Error updating user item for ${userID} when crafting ${craftCommand.title}`, updateError.message);
-                //     return;
-                // }
-
-                console.log(`Deducted '${material.materials.name} x ${material.amount}' from ${userID} when crafting '${newItem.emoji} ${newItem.name}', from ${currentOwnedOfMaterial.itemamount} to ${newUpdateAmount}`);
-            });
-
-            // add new craft item to user_item table
-
-            // const { error: insertError } = supabase.from('user_item').insert([{
-            //     userid: userID,
-            //     channelid: "craft",
-            //     itememoji: newItem.emoji,
-            //     itemname: newItem.name,
-            //     itemamount: 1,
-            //     timestamp: new Date().toISOString(),
-            // }]);
-
-            // if (insertError) {
-            //     console.error(`Error inserting new item for ${userID} after crafting ${craftCommand.title}`, insertError.message);
-            //     return;
-            // }
-
-            console.log(`Adding '${newItem.emoji} ${newItem.name}' to user ${userID} when crafting ${craftCommand.command}`);
-
-            // send a success message
-            message.reply(`Congratulations! You have successfully crafted '${newItem.emoji} ${newItem.name}'!`);
-        } else {
-            message.reply('You can\'t craft this item right now or you don\'t have enough materials, comeback again later!');
-        }
-    } else {
-        // Logic for when user wants to check crafting requirements
-        console.log(`Checking command issued: ${baseCommand}`);
-        console.log(`Checking command issued: ${baseCommand} > craftCommand, ${craftCommand}`);
-
-        // Add checking logic here
-        if (craftCommand) {
-
-            const username = message.author.username;
-            console.log(`[${username}] Requested !${command}`); // Log difference
-
-            let embed = new EmbedBuilder()
-                .setColor(0xE6DAC3)
-                .setTitle(`**⚒️ ${craftCommand.title} ⚒️**`);
-
-            const { materials, userMaterials } = await fetchCraftItemsRequired(supabase, message, craftCommand);
-
-            // this craft has materials > print material
-            // to start whole process both need to be true
-            if (materials && materials.length > 0 && userMaterials && userMaterials.length > 0) {
-                let desc = craftCommand.description + '\n\n';
-                let isAllMaterialsFound = true;
-                materials.forEach(material => {
-                    // list each required item and how many they have
-                    let currentOwnedOfMaterial = userMaterials.find(userMaterial => userMaterial.itemname === material.materials.name);
-                    currentOwnedOfMaterial = currentOwnedOfMaterial ? currentOwnedOfMaterial.itemamount : 0;
-                    if (currentOwnedOfMaterial < material.amount) {
-                        isAllMaterialsFound = false;
-                    }
-                    desc += `${material.materials.emoji} ${material.materials.name}: ${currentOwnedOfMaterial}/${material.amount}\n`;
-                });
-                if (isAllMaterialsFound) {
-                    desc += '\n—————————————————————————————————————————\n';
-                    desc += '✅ You have all the required materials!\n';
-                    desc += '✅ Typing `' + craftCommand.command + ' start` to craft an item\n';
-                    desc += '\n—————————————————————————————————————————\n';
-                } else {
-                    desc += '\n—————————————————————————————————————————\n';
-                    desc += '❌ Insufficient materials!\n';
-                    desc += '❌ Please gather more resources.';
-                    desc += '\n—————————————————————————————————————————\n';
-                }
-                embed.setDescription(desc);
-            } else {
-                // this craft is not material.. more like a details ?
-                embed.setDescription(craftCommand.description.replace('<br/>', '\n'));
-            }
-
-            // add thumbnail if exist
-            if (craftCommand.thumbnail) {
-                embed.setThumbnail(craftCommand.thumbnail);
-            }
-            // add footer and timestamp
-            embed.setFooter({ text: craftCommand.footer }).setTimestamp();
-
-            // sent message to channel
-            message.reply({ embeds: [embed] });
-
+        // If the item wasn't found (shouldn't happen if custom IDs are generated correctly, but good practice to check)
+        if (!itemToCraft) {
+            await interaction.editReply('Error: Could not identify the item you wish to craft.');
             return;
         }
+
+        const reqMaterialID = itemToCraft.id;
+        const reqMaterialName = itemToCraft.name;
+        const reqMaterialAmount = itemToCraft.amount;
+        const reqMaterialArray = itemToCraft.materials; // { id, material_id, amount, materials{name,emoji} }
+
+        let resultPrepareItem = [];
+
+        // Helper function to create material item object
+        // Valid or Invalid material item object
+        const createMaterialItem = (materialId, materialName, materialAmount, userItemMatch = null) => {
+            const baseItem = {
+                material_id: materialId,
+                name: materialName,
+                amount: materialAmount,
+            };
+
+            if (userItemMatch) {
+                return {
+                    ...baseItem,
+                    id: userItemMatch.id,
+                    amount_owned: userItemMatch.amount,
+                    amount_new: userItemMatch.amount - materialAmount,
+                    valid: userItemMatch.amount >= materialAmount,
+                    userItemMatch: userItemMatch,
+                };
+            }
+
+            return {
+                ...baseItem,
+                id: 0,
+                amount_owned: 0,
+                amount_new: 0,
+                valid: false,
+                userItemMatch: null,
+            };
+        };
+
+        // Process all required materials in parallel
+        await Promise.all(reqMaterialArray.map(async ({ material_id, amount, materials }) => {
+            const userItem = await getUserItem({ userId, itemId: material_id });
+            const userItemMatch = userItem?.[0];
+            const materialItem = createMaterialItem(
+                material_id,
+                materials.name,
+                amount,
+                userItemMatch
+            );
+            resultPrepareItem.push(materialItem);
+        }));
+        const isValid = resultPrepareItem.every(item => item.valid);
+        if (isValid) {
+
+            // console.log("resultPrepareItem: ", resultPrepareItem);
+
+            // update item
+            let allUpdated = true, allUpdateResult = [];
+            await Promise.all(resultPrepareItem.map(async ({ amount_owned, amount_new, userItemMatch }) => {
+                const userUpdObj = { id: userId };
+                const resultUpdate = await updateUserItem(userUpdObj, userItemMatch, amount_owned, amount_new);
+                allUpdateResult.push(resultUpdate);
+                if (!resultUpdate) allUpdated = false;
+            }));
+
+            // insert new item
+            if (allUpdated) {
+                const userUpdObj = { id: userId, username: username };
+                const existingCraftedItem = await getUserItem({ userId, itemId: reqMaterialID });
+                let craftSuccess = false;
+                if (existingCraftedItem?.[0]) {
+                    // Update existing crafted item
+                    const currentAmount = existingCraftedItem[0].amount;
+                    craftSuccess = await updateUserItem(
+                        userUpdObj,
+                        existingCraftedItem[0],
+                        currentAmount,
+                        currentAmount + 1
+                    );
+                } else {
+                    // Insert new crafted item
+                    const userInsObj = { id: reqMaterialID, name: reqMaterialName };
+                    craftSuccess = await insertUserItem(userUpdObj, userInsObj, 1);
+                }
+                
+                if (craftSuccess) {
+                    // announce message to user/channel
+                    await interaction.editReply(`Success: You crafted **${itemToCraft.emoji} ${itemToCraft.name}**`);
+                    interaction.channel.send(`<@${userId.toString()}> crafted: ${itemToCraft.emoji} ${itemToCraft.name}`);
+                } else {
+                    // insert failed
+                    await interaction.editReply(`Fail: You crafted **${itemToCraft.emoji} ${itemToCraft.name}** but failed to insert new item. (ER-2)`);
+                }
+            } else {
+                // deduct item fail
+                await interaction.editReply(`Fail: You crafted **${itemToCraft.emoji} ${itemToCraft.name}** but failed to to deduct material. (ER-1)`);
+            }
+            //await interaction.editReply(`This feature coming soon! (crafting ${itemToCraft.emoji} ${itemToCraft.name})\nStay tuned! for upcoming features!🤗`);
+        } else {
+            await interaction.editReply(`Fail: You don't have enough material to craft **${itemToCraft.emoji} ${itemToCraft.name}**.`);
+        }
     }
 }
-
-module.exports = { handleCraftCommand };
+// --- Command Export ---
+module.exports = {
+    handleCraftCommand,
+    handleCraftButtonClick
+};

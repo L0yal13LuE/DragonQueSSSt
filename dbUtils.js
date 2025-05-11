@@ -320,8 +320,8 @@ const getShop = async (channelId) => {
     try {
         const { data: shopData, error } = await supabase.from('shops')
             .select('*')
-            .eq('channelid', channelId)
-            .single(); // Add single() if each channel ID should only have one shop
+            .eq('channel_id', channelId)
+            .single(); // Only one shop per channel
         
         if (error) {
             console.error(`Error fetching shop for channel ${channelId}:`, error.message);
@@ -348,6 +348,7 @@ const getShopItems = async (shopId) => {
         const { data: shopItems, error } = await supabase.from('shop_items')
             .select('*')
             .eq('shop_id', shopId)
+            .eq('is_active', true) // Only active items
             .order('created_at'); // Add ordering if needed
             
         if (error) {

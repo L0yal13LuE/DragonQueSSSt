@@ -1,10 +1,10 @@
 require('dotenv').config({
     path: {
-      development: '.env',
-      staging: '.env.staging',
-      production: '.env.production'
+        development: '.env',
+        staging: '.env.staging',
+        production: '.env.production'
     }[process.env.NODE_ENV || 'development']
-  });
+});
 
 const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
 const { supabase } = require('./supabaseClient'); // Import supabase client
@@ -22,9 +22,9 @@ const { handleMaterialCommand } = require('./managers/materialManager.js');
 
 // -- Addition Command Handlers ---
 const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
-const { handleShopCommand, handlePressBuy } = require('./managers/shopManager.js');
-const { shopSettings } = require('./managers/shopWorkshop.js'); // shop setting getter from db
-const { handleCraftCommand } = require('./managers/craftManager.js'); 
+const { shopSettings, craftSettings } = require('./managers/shopWorkshop.js');
+const { handleShopCommand, handleShopButtonClick } = require('./managers/shopManager.js');
+const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -64,6 +64,7 @@ let currentMonsterStateRef = { current: null };
 
 // -- Shop instance
 let shopWorkShopSettings = null;
+let craftWorkShopSettings = null;
 
 // --- Bot Ready Event ---
 client.once('ready', async () => {
@@ -94,14 +95,22 @@ client.once('ready', async () => {
         console.warn("Announcement channel unavailable, cannot send online announcement.");
     }
 
-    // Fetch shop from DB by channelId (TODO: get channel from DB, no more manual input)
-    // shopWorkShopSettings = await shopSettings('1367030652834283590');
-    // if (shopWorkShopSettings) {
-    //     console.log(`[Shop] found: ${shopWorkShopSettings.title}`);
-    // } else {
-    //     console.log(`[Shop] not found: ${shopWorkShopSettings}`);
-    // }
-    
+    // Spawn shop npc, spawn at certain channel but available on every channel
+    shopWorkShopSettings = await shopSettings('1367030652834283590', client);
+    if (shopWorkShopSettings) {
+        console.log(`[Shop] found: ${shopWorkShopSettings.title}`);
+    } else {
+        console.log(`[Shop] not found: ${shopWorkShopSettings}`);
+    }
+
+    // Spawn craft npc
+    craftWorkShopSettings = await craftSettings('!craft', client);
+    if (craftWorkShopSettings) {
+        console.log(`[Craft] found: ${craftWorkShopSettings.title}`);
+    } else {
+        console.log(`[Craft] not found: ${craftWorkShopSettings}`);
+    }
+
     // Setup Hourly Monster Check
     if (supabase && announcementChannel) {
         console.log("Setting up hourly monster check...");
@@ -124,8 +133,8 @@ client.on('messageCreate', async (message) => {
 
         if (command === 'rank' || command === 'level') commandHandlers.handleRankCommand(message);
         // else if (command === 'leaderboard') handleLeaderboardCommand(message, client); // TODO: still need to be implemented more
-        else if (command === 'shop' && shopWorkShopSettings) handleShopCommand(message, shopWorkShopSettings);
-        else if (command === 'craft') handleCraftCommand(supabase, message.content, message, client);
+        else if (command === 'shop_' && shopWorkShopSettings) handleShopCommand(message, shopWorkShopSettings);
+        else if (command === 'craft_' && craftWorkShopSettings) handleCraftCommand(message, craftWorkShopSettings);
         // else if (command === 'chat') commandHandlers.handleChatCommand(message, args); // useless ?
         else if (command === 'bag') commandHandlers.handleBagCommand(message);
         else if (command === 'monster') commandHandlers.handleMonsterCommand(message, currentMonsterStateRef.current); // Pass current state
@@ -156,9 +165,23 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// Handle button interactions
+// set discord `client` event listener
 client.on(Events.InteractionCreate, async interaction => {
-    if (shopWorkShopSettings) await handlePressBuy(interaction, shopWorkShopSettings);
+    try {
+        console.error("Events.InteractionCreate : start!", interaction.customId);
+        if (interaction.isButton() && interaction.customId.startsWith('buy_') && shopWorkShopSettings) {
+            console.log("[Shop] Click Button : ", interaction.customId);
+            await handleShopButtonClick(interaction, shopWorkShopSettings);
+            return;
+        }
+        if (interaction.isButton() && interaction.customId.startsWith('craft_') && craftWorkShopSettings) {
+            console.log("[Craft] Click Button : ", interaction.customId);
+            await handleCraftButtonClick(interaction, craftWorkShopSettings);
+            return;
+        }
+    } catch (error) {
+        console.error("Events.InteractionCreate : Failed!", error);
+    }
 });
 
 // --- Login to Discord ---
