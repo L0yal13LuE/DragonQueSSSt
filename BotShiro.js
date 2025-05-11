@@ -1,5 +1,3 @@
-const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
-const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({
     path: {
       development: '.env',
@@ -7,6 +5,9 @@ require('dotenv').config({
       production: '.env.production'
     }[process.env.NODE_ENV || 'development']
   });
+
+const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
+const { supabase } = require('./supabaseClient'); // Import supabase client
 
 // --- Internal Modules ---
 const CONSTANTS = require('./constants');
@@ -32,10 +33,6 @@ const ITEM_DROP_CHANNEL_ID = process.env.ITEM_DROP_CHANNEL_ID; // For item-drop-
 
 const CHANNEL_ID_1 = ANNOUNCEMENT_CHANNEL_ID; 
 
-// Supabase Configuration
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-
 // --- Configuration Validation ---
 if (!TOKEN) {
     console.error('FATAL ERROR: DISCORD_TOKEN not found in .env file!');
@@ -47,11 +44,6 @@ if (!ANNOUNCEMENT_CHANNEL_ID) {
     console.warn('Level-up announcements will not be sent to a dedicated channel.');
 }
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.error('WARNING: Supabase URL or Anon Key not found in .env file!');
-    console.error('Database functionality will be limited or unavailable.');
-}
-
 // --- Initialize Discord Client ---
 const client = new Client({
     intents: [
@@ -61,9 +53,6 @@ const client = new Client({
         GatewayIntentBits.DirectMessages, // Optional
     ],
 });
-
-// --- Initialize Supabase Client ---
-const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 // --- Caches and State ---
 const userCooldowns = new Collection();
@@ -79,7 +68,6 @@ let shopWorkShopSettings = null;
 // --- Bot Ready Event ---
 client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
-    console.log(`Supabase client initialized: ${!!supabase}`);
 
     // Fetch Channel Objects
     if (ANNOUNCEMENT_CHANNEL_ID) {
@@ -107,7 +95,7 @@ client.once('ready', async () => {
     }
 
     // Fetch shop from DB by channelId (TODO: get channel from DB, no more manual input)
-    // shopWorkShopSettings = await shopSettings(supabase, '1367030652834283590');
+    // shopWorkShopSettings = await shopSettings('1367030652834283590');
     // if (shopWorkShopSettings) {
     //     console.log(`[Shop] found: ${shopWorkShopSettings.title}`);
     // } else {
@@ -117,8 +105,8 @@ client.once('ready', async () => {
     // Setup Hourly Monster Check
     if (supabase && announcementChannel) {
         console.log("Setting up hourly monster check...");
-        await gameLogic.hourlyMonsterCheck(supabase, client, announcementChannel, currentMonsterStateRef); // Initial check on startup
-        setInterval(() => gameLogic.hourlyMonsterCheck(supabase, client, announcementChannel, currentMonsterStateRef), CONSTANTS.HOURLY_CHECK_INTERVAL);
+        await gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef); // Initial check on startup
+        setInterval(() => gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef), CONSTANTS.HOURLY_CHECK_INTERVAL);
         console.log(`Hourly monster check scheduled every ${CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)} minutes.`);
     } else {
         console.warn("Hourly monster check cannot be started: Supabase or Announcement Channel unavailable.");
@@ -134,15 +122,15 @@ client.on('messageCreate', async (message) => {
         const args = message.content.slice(CONSTANTS.COMMAND_PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        if (command === 'rank' || command === 'level') commandHandlers.handleRankCommand(message, supabase);
-        // else if (command === 'leaderboard') handleLeaderboardCommand(message, supabase, client); // TODO: still need to be implemented more
+        if (command === 'rank' || command === 'level') commandHandlers.handleRankCommand(message);
+        // else if (command === 'leaderboard') handleLeaderboardCommand(message, client); // TODO: still need to be implemented more
         else if (command === 'shop' && shopWorkShopSettings) handleShopCommand(message, shopWorkShopSettings);
         else if (command === 'craft') handleCraftCommand(supabase, message.content, message, client);
         // else if (command === 'chat') commandHandlers.handleChatCommand(message, args); // useless ?
-        else if (command === 'bag') commandHandlers.handleBagCommand(message, supabase);
-        else if (command === 'monster') commandHandlers.handleMonsterCommand(message, supabase, currentMonsterStateRef.current); // Pass current state
-        else if (command === 'spin') handleSpinCommand(message, supabase); // Keep using the imported manager
-        else if (command === 'material') handleMaterialCommand(message, supabase); // Keep using the imported manager
+        else if (command === 'bag') commandHandlers.handleBagCommand(message);
+        else if (command === 'monster') commandHandlers.handleMonsterCommand(message, currentMonsterStateRef.current); // Pass current state
+        // else if (command === 'spin') handleSpinCommand(message); // Keep using the imported manager
+        else if (command === 'material') handleMaterialCommand(message); // Keep using the imported manager
         // Add other commands here
     }
     // Non-Command Message Processing
@@ -164,7 +152,7 @@ client.on('messageCreate', async (message) => {
         // --- END BOT MENTION CHECK ---
 
         // Pass necessary dependencies and the state reference object
-        gameLogic.handleExpGain(message, supabase, userCooldowns, announcementChannel, itemDropChannel, currentMonsterStateRef);
+        gameLogic.handleExpGain(message, userCooldowns, announcementChannel, itemDropChannel, currentMonsterStateRef);
     }
 });
 

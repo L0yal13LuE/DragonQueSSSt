@@ -55,8 +55,8 @@ const createBagEmbed = (author, itemList) => {
   return createBaseEmbed({
     color: 0x8a2be2, // Purple
     title: `🎒 My Bag 🎒`,
-    footer: { text: `Collect items, you might need them for rewards 😉` },
-    description: `${author.toString()} Let's take a look inside your bag\n\n${itemList}`,
+    footer: { text: `Collect items for rewards! 😉` },
+    description: `${author.toString()} Let's see what's inside!\n\n${itemList}`,
   });
 };
 

@@ -1,12 +1,12 @@
+const { supabase } = require('../supabaseClient');
 const { EmbedBuilder } = require('discord.js');
 
 /**
  * Handles the '!spin' command to fetch and display a random card.
  * @param {object} message - The Discord message object.
- * @param {object} supabase - The Supabase client instance.
  */
-const handleSpinCommand = async (message, supabase) => {
-    // Check if the Supabase client is available
+const handleSpinCommand = async (message) => {
+    // Check if the Supabase client is available (imported)
     if (!supabase) {
         message.reply('ฐานข้อมูลมีปัญหา ลองอีกครั้งนะ 😥'); // Database issue reply (Thai)
         message.reply('Database connection issue. Please try again later. 😥'); // Database issue reply
