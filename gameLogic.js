@@ -273,7 +273,7 @@ const hourlyMonsterCheck = async (client, announcementChannel, currentMonsterSta
         }
 
         // --- Check Today's Monster ---
-        let monsterForToday = false; //await getMonsterForDate(today);
+        let monsterForToday = await getMonsterForDate(today);
 
         if (!monsterForToday) {
             console.log("Hourly Check: No monster for today. Spawning...");
