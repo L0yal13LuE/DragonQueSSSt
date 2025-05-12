@@ -62,7 +62,7 @@ const spawnNewMonster = async (dateString) => {
     }
 
     const chosenMonster = allMonsters[Math.floor(Math.random() * allMonsters.length)];
-    const monsterHp = chosenMonster.baseHp * (constants.LEVELING_FACTOR / 5);
+    const monsterHp = chosenMonster.base_hp * (constants.LEVELING_FACTOR / 5);
 
     return await createMonster(dateString, chosenMonster.name, Math.round(monsterHp));
 };
@@ -273,7 +273,7 @@ const hourlyMonsterCheck = async (client, announcementChannel, currentMonsterSta
         }
 
         // --- Check Today's Monster ---
-        let monsterForToday = await getMonsterForDate(today);
+        let monsterForToday = false; //await getMonsterForDate(today);
 
         if (!monsterForToday) {
             console.log("Hourly Check: No monster for today. Spawning...");
