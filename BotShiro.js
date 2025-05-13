@@ -1,10 +1,10 @@
 require('dotenv').config({
     path: {
-      development: '.env',
-      staging: '.env.staging',
-      production: '.env.production'
+        development: '.env',
+        staging: '.env.staging',
+        production: '.env.production'
     }[process.env.NODE_ENV || 'development']
-  });
+});
 
 const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
 const { supabase } = require('./supabaseClient'); // Import supabase client
@@ -22,8 +22,9 @@ const { handleMaterialCommand } = require('./managers/materialManager.js');
 
 // -- Addition Command Handlers ---
 const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
-const { handleShopCommand, handlePressBuy } = require('./managers/shopManager.js');
-const { shopSettings } = require('./managers/shopWorkshop.js'); // shop setting getter from db
+const { shopSettings, craftSettings } = require('./managers/shopWorkshop.js');
+const { handleShopCommand, handleShopButtonClick } = require('./managers/shopManager.js');
+const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
 
 // --- Configuration ---
@@ -64,6 +65,7 @@ let currentMonsterStateRef = { current: null };
 
 // -- Shop instance
 let shopWorkShopSettings = null;
+let craftWorkShopSettings = null;
 
 // --- Bot Ready Event ---
 client.once('ready', async () => {
@@ -94,13 +96,21 @@ client.once('ready', async () => {
         console.warn("Announcement channel unavailable, cannot send online announcement.");
     }
 
-    // Fetch shop from DB by channelId (TODO: get channel from DB, no more manual input)
-    // shopWorkShopSettings = await shopSettings('1367030652834283590');
-    // if (shopWorkShopSettings) {
-    //     console.log(`[Shop] found: ${shopWorkShopSettings.title}`);
-    // } else {
-    //     console.log(`[Shop] not found: ${shopWorkShopSettings}`);
-    // }
+    // Spawn shop npc, spawn at certain channel but available on every channel
+    shopWorkShopSettings = await shopSettings('1367030652834283590', client);
+    if (shopWorkShopSettings) {
+        console.log(`[Shop] found: ${shopWorkShopSettings.title}`);
+    } else {
+        console.log(`[Shop] not found: ${shopWorkShopSettings}`);
+    }
+
+    // Spawn craft npc
+    craftWorkShopSettings = await craftSettings('!craft', client);
+    if (craftWorkShopSettings) {
+        console.log(`[Craft] found: ${craftWorkShopSettings.title}`);
+    } else {
+        console.log(`[Craft] not found: ${craftWorkShopSettings}`);
+    }
     
     // Load dynamic configurations like EXP_PER_CHARACTER and COOLDOWN_MILLISECONDS
     if (supabase) {
@@ -172,7 +182,7 @@ client.on('messageCreate', async (message) => {
         const args = message.content.slice(CONSTANTS.COMMAND_PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-                switch (command) {
+        switch (command) {
             case 'rank':
             case 'level':
                 commandHandlers.handleRankCommand(message);
@@ -183,9 +193,11 @@ client.on('messageCreate', async (message) => {
             case 'shop':
                 if (shopWorkShopSettings) {
                     handleShopCommand(message, shopWorkShopSettings);
-                } else {
-                    // Optionally, send a message if the shop isn't available/configured
-                    // message.reply("The shop is currently unavailable.");
+                }
+                break;
+            case 'craft':
+                if (craftWorkShopSettings) {
+                    handleCraftCommand(message, craftWorkShopSettings);
                 }
                 break;
             // case 'chat': // useless ?
@@ -229,9 +241,23 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// Handle button interactions
+// set discord `client` event listener
 client.on(Events.InteractionCreate, async interaction => {
-    if (shopWorkShopSettings) await handlePressBuy(interaction, shopWorkShopSettings);
+    try {
+        console.error("Events.InteractionCreate : start!", interaction.customId);
+        if (interaction.isButton() && interaction.customId.startsWith('buy_') && shopWorkShopSettings) {
+            console.log("[Shop] Click Button : ", interaction.customId);
+            await handleShopButtonClick(interaction, shopWorkShopSettings);
+            return;
+        }
+        if (interaction.isButton() && interaction.customId.startsWith('craft_') && craftWorkShopSettings) {
+            console.log("[Craft] Click Button : ", interaction.customId);
+            await handleCraftButtonClick(interaction, craftWorkShopSettings);
+            return;
+        }
+    } catch (error) {
+        console.error("Events.InteractionCreate : Failed!", error);
+    }
 });
 
 // --- Login to Discord ---
