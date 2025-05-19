@@ -1,7 +1,7 @@
 // managers/shopManager.js
 
 // --- Required Libraries ---
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, ComponentType, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, Collector } = require('discord.js');
 const { createBaseEmbed } = require("./embedManager");
 const wait = require('node:timers/promises').setTimeout;
 const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/materialProvider");
@@ -36,7 +36,7 @@ const handleShopCommand = async (message, args) => {
             const chunk = itemsInSelectMenu.slice(i, i + 25);
             const placeholderCount = (itemsInSelectMenu.length <= 25) ? '' : `(Items ${i + 1}-${Math.min(i + 25, itemsInSelectMenu.length)})`;
             const selectMenu = new StringSelectMenuBuilder()
-                .setCustomId(`shop_base_${Math.floor(i / 25)}`)
+                .setCustomId(`shop_base_${Math.floor(1000 + Math.random() * 9000)}`)
                 .setPlaceholder(`Select an item to buy ${placeholderCount}`)
                 .addOptions(chunk)
                 .setMinValues(1)
@@ -45,9 +45,20 @@ const handleShopCommand = async (message, args) => {
         }
 
         // --- 4. Send the embed with the select menus ---
-        await message.reply({
+        const reply = await message.reply({
             embeds: [baseEmbed],
             components: rows,
+        });
+        // --- 5. Set up a collector for the select menus ---
+        const collector = reply.createMessageComponentCollector({
+            componentType: ComponentType.StringSelect,
+            time: 60000
+        });
+        // --- 6. Handle select menu interactions ---
+        collector.on('collect', async interaction => {
+            console.log("interaction.values: ", interaction.values);
+            args.message = message;
+            await handleShopSelectMenuClick(interaction, args);
         });
     } catch (error) {
         console.error('Error sending shop embed with buttons:', error);
@@ -117,9 +128,7 @@ const handleShopButtonClick = async (interaction, args) => {
 const handleShopSelectMenuClick = async (interaction, args) => {
     try {
         // Validate user permissions
-        if (!validateUserPermissions(interaction)) {
-            return;
-        }
+        if (!validateUserPermissions(interaction)) return;
 
         // Validate interaction type
         if (!interaction.isStringSelectMenu()) return;
@@ -141,14 +150,30 @@ const handleShopSelectMenuClick = async (interaction, args) => {
 // Helper Functions
 
 const validateUserPermissions = (interaction) => {
-    const authorOnly = true;
-    if (authorOnly && interaction.user.id !== interaction.member.user.id) {
+
+    // Check if interaction is from command author
+    if (interaction.user.id !== interaction.member.user.id) {
         interaction.reply({
-            content: '⚠️ You can\'t use someone else shop, start your shop by typing `!shop`',
+            content: '⚠️ You can\'t use someone else\'s shop, start your shop by typing `!shop`',
             ephemeral: true
         });
         return false;
     }
+
+    // Check if interaction is within 5 minute time window
+    const interactionTime = Date.now();
+    const commandTime = interaction.message.createdTimestamp;
+    const timeDiff = interactionTime - commandTime;
+
+    // if (timeDiff > 300000) { // 5 minutes in milliseconds
+    if (timeDiff > 60000) { // 1 minutes in milliseconds
+        interaction.reply({
+            content: '⚠️ Shop expired, Please run the command again.',
+            ephemeral: true
+        });
+        return false;
+    }
+
     return true;
 };
 

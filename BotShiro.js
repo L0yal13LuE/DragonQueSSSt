@@ -91,7 +91,7 @@ client.once('ready', async () => {
 
     // Send Online Announcement
     if (announcementChannel) {
-        await announcements.sendOnlineAnnouncement(announcementChannel);
+        // await announcements.sendOnlineAnnouncement(announcementChannel);
     } else {
         console.warn("Announcement channel unavailable, cannot send online announcement.");
     }
@@ -245,11 +245,11 @@ client.on('messageCreate', async (message) => {
 client.on(Events.InteractionCreate, async interaction => {
     try {
         console.error("Events.InteractionCreate : start!", interaction.customId);
-        if (interaction.isStringSelectMenu() && interaction.customId.startsWith('shop_base') && shopWorkShopSettings) {
-            console.log("[Shop] Select choice : ", interaction.customId);
-            await handleShopSelectMenuClick(interaction, shopWorkShopSettings);
-            return;
-        }
+        // if (interaction.isStringSelectMenu() && interaction.customId.startsWith('shop_base') && shopWorkShopSettings) {
+        //     console.log("[Shop] Select choice : ", interaction.customId);
+        //     await handleShopSelectMenuClick(interaction, shopWorkShopSettings);
+        //     return;
+        // }
         if (interaction.isButton() && interaction.customId.startsWith('craft_') && craftWorkShopSettings) {
             console.log("[Craft] Click Button : ", interaction.customId);
             await handleCraftButtonClick(interaction, craftWorkShopSettings);
