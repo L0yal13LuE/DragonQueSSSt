@@ -110,7 +110,8 @@ const craftSettings = async (command, client) => {
             .from('crafts')
             .select('*')
             .like('command', `${command} %`)
-            .eq('is_active', true);
+            .eq('is_active', true)
+            .order('id', { ascending: true });
 
         if (error) {
             console.error("Error fetching craft sub-command:", error);
@@ -148,7 +149,7 @@ const craftSettings = async (command, client) => {
         if (craftCommand) {
             const craftSubCommand = await getCraftSubCommand();
 
-            // console.log("[Craft] sub-command:", craftSubCommand);
+            //console.log("[Craft] sub-command:", craftSubCommand);
             if (!craftSubCommand) {
                 console.log("[Craft] No items for craft : craftSubCommand", craftSubCommand);
             }
@@ -181,14 +182,14 @@ const craftSettings = async (command, client) => {
                 const materialsForItemToCraft = await getCraftSubCommandItems(item.id);
                 // console.log("[Craft] materialsForItemToCraft:", materialsForItemToCraft);
     
-                fieldsItems.push({
+                fieldsItems[index] = {
                     id: itemToCraft.id,
                     emoji: itemToCraft.emoji,
                     name: itemToCraft.name,
                     amount: 1,
                     letter: letter,
                     materials: materialsForItemToCraft
-                });
+                };
             }));
             
             // Now fieldsItems is populated with all items
