@@ -346,9 +346,10 @@ const getShopItems = async (shopId) => {
     if (!supabase) return null;
     try {
         const { data: shopItems, error } = await supabase.from('shop_items')
-            .select('*')
+            .select('*, materials(id,emoji,name)')
             .eq('shop_id', shopId)
-            .eq('is_active', true) // Only active items
+            .eq('is_active', true)
+            .eq('materials.is_active', true)
             .order('created_at'); // Add ordering if needed
             
         if (error) {

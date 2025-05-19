@@ -23,7 +23,7 @@ const { handleMaterialCommand } = require('./managers/materialManager.js');
 // -- Addition Command Handlers ---
 const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
 const { shopSettings, craftSettings } = require('./managers/shopWorkshop.js');
-const { handleShopCommand, handleShopButtonClick } = require('./managers/shopManager.js');
+const { handleShopCommand, handleShopSelectMenuClick } = require('./managers/shopManager.js');
 const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
 
@@ -245,9 +245,9 @@ client.on('messageCreate', async (message) => {
 client.on(Events.InteractionCreate, async interaction => {
     try {
         console.error("Events.InteractionCreate : start!", interaction.customId);
-        if (interaction.isButton() && interaction.customId.startsWith('buy_') && shopWorkShopSettings) {
-            console.log("[Shop] Click Button : ", interaction.customId);
-            await handleShopButtonClick(interaction, shopWorkShopSettings);
+        if (interaction.isStringSelectMenu() && interaction.customId.startsWith('shop_base') && shopWorkShopSettings) {
+            console.log("[Shop] Select choice : ", interaction.customId);
+            await handleShopSelectMenuClick(interaction, shopWorkShopSettings);
             return;
         }
         if (interaction.isButton() && interaction.customId.startsWith('craft_') && craftWorkShopSettings) {

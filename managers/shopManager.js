@@ -1,13 +1,15 @@
 // managers/shopManager.js
 
 // --- Required Libraries ---
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 const { createBaseEmbed } = require("./embedManager");
+const wait = require('node:timers/promises').setTimeout;
+const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/materialProvider");
 
 const handleShopCommand = async (message, args) => {
     try {
-        // --- Create Embed with Items ---
-        // Create a base embed with title, description, thumbnail, and footer
+
+        // --- 1. Create Embed text ---
         const baseEmbed = createBaseEmbed({
             color: '#0099ff',
             title: args.title,
@@ -16,49 +18,36 @@ const handleShopCommand = async (message, args) => {
             footer: { 'text': args.footer },
         })
 
-        // Add items as fields to the embed using the new parameters
-        const lettesArray = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+        // --- 2. Create Select Menu for each item ---
+        const itemsInSelectMenu = [];
         args.items.forEach((item, index) => {
-            // Add the item as a field to the embed
-            let itemLetter = lettesArray[index];
-            baseEmbed.addFields({
-                name: `:regional_indicator_${itemLetter.toLowerCase()}: — ${item.emoji} ${item.name}`, // Combine emoji and item name for the field name
-                value: `${item.price} ${item.currency}`, // Display the price in the value
-                inline: false // Set to true to display items side-by-side if they fit (up to 3 per row usually)
-            });
+            const amountSuffix = (item.amount > 1) ? `(x${item.amount.toLocaleString()})` : '';
+            const itemValue = `${item.materials.id}-${item.amount}-${item.materials.emoji}-${item.materials.name}/${item.material_use_id}-${item.price}-${item.currency}`;
+            itemsInSelectMenu[index] = new StringSelectMenuOptionBuilder()
+                .setLabel(`${item.materials.name} ${amountSuffix}`)
+                .setDescription(`${item.price.toLocaleString()} ${item.currency}`)
+                .setValue(itemValue)
+                .setEmoji(item.materials.emoji);
         });
 
-        // --- Create Buttons for each item ---
+        // --- 3. Create multiple select menus for chunks of 25 items
         const rows = [];
-        let currentRow = new ActionRowBuilder();
+        for (let i = 0; i < itemsInSelectMenu.length; i += 25) {
+            const chunk = itemsInSelectMenu.slice(i, i + 25);
+            const placeholderCount = (itemsInSelectMenu.length <= 25) ? '' : `(Items ${i + 1}-${Math.min(i + 25, itemsInSelectMenu.length)})`;
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId(`shop_base_${Math.floor(i / 25)}`)
+                .setPlaceholder(`Select an item to buy ${placeholderCount}`)
+                .addOptions(chunk)
+                .setMinValues(1)
+                .setMaxValues(1);
+            rows.push(new ActionRowBuilder().addComponents(selectMenu));
+        }
 
-        args.items.forEach((item, index) => {
-            const uniqueItemId = `${item.name}`;
-            let itemLetter = lettesArray[index];
-            const button = new ButtonBuilder()
-                // Create a unique custom ID for the button, based on the item name
-                // .setCustomId(`buy_${uniqueItemId.replace(/\s+/g, '_')}`)
-                // .setLabel(`Buy ${item.emoji} ${item.name}`) // Button text
-                .setCustomId(`buy_${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}`)
-                .setLabel(itemLetter) // Button text
-                .setStyle(ButtonStyle.Primary); // Use a primary button style
-            // .setStyle(ButtonStyle.Secondary); // Use a primary button style
-
-            // Add button to the current row
-            currentRow.addComponents(button);
-
-            // If the current row has 5 buttons or it's the last item, push the row and start a new one
-            if (currentRow.components.length === 5 || index === args.items.length - 1) {
-                rows.push(currentRow);
-                if (index < args.items.length - 1) { // Don't create a new row if it's the very last item
-                    currentRow = new ActionRowBuilder();
-                }
-            }
-        });
-
+        // --- 4. Send the embed with the select menus ---
         await message.reply({
             embeds: [baseEmbed],
-            components: rows, // Attach the action rows containing the buttons
+            components: rows,
         });
     } catch (error) {
         console.error('Error sending shop embed with buttons:', error);
@@ -124,8 +113,162 @@ const handleShopButtonClick = async (interaction, args) => {
         }
     }
 }
+
+const handleShopSelectMenuClick = async (interaction, args) => {
+    try {
+        // Validate user permissions
+        if (!validateUserPermissions(interaction)) {
+            return;
+        }
+
+        // Validate interaction type
+        if (!interaction.isStringSelectMenu()) return;
+        if (!interaction.customId.startsWith('shop_base') || !interaction.values.length) return;
+
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        // Parse selected item details
+        const itemDetails = parseSelectedItem(interaction.values[0]);
+
+        // Process purchase
+        await processPurchase(interaction, itemDetails);
+    } catch (error) {
+        console.error('Shop purchase error:', error);
+        await handlePurchaseError(interaction, error);
+    }
+};
+
+// Helper Functions
+
+const validateUserPermissions = (interaction) => {
+    const authorOnly = true;
+    if (authorOnly && interaction.user.id !== interaction.member.user.id) {
+        interaction.reply({
+            content: '⚠️ You can\'t use someone else shop, start your shop by typing `!shop`',
+            ephemeral: true
+        });
+        return false;
+    }
+    return true;
+};
+
+const parseSelectedItem = (selectedValue) => {
+    try {
+        const [itemName, itemPrice] = selectedValue.split('/');
+        const [material_id, material_amount, emoji, name] = itemName.split('-');
+        const [material_use_id, price, currency] = itemPrice.split('-');
+
+        return {
+            material_id,
+            material_amount: parseInt(material_amount),
+            emoji,
+            name,
+            material_use_id,
+            price: parseInt(price),
+            currency
+        };
+    } catch (error) {
+        return null;
+    }
+};
+
+const processPurchase = async (interaction, itemDetails) => {
+    const userId = interaction.user.id;
+    const username = interaction.member.user.username;
+
+    // Check user's currency balance
+    const userCurrency = await getUserItem({
+        userId: userId,
+        itemId: itemDetails.material_use_id
+    });
+
+    if (!userCurrency?.length) {
+        await interaction.editReply(`You don't have any **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!`);
+        return;
+    }
+
+    const currentBalance = userCurrency[0].amount;
+    if (currentBalance < itemDetails.price) {
+        await interaction.editReply(`You don't have enough **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!, You have **${currentBalance.toLocaleString()} ${itemDetails.currency}**`);
+        return;
+    }
+
+    // Process currency deduction
+    const success = await deductCurrency(userId, userCurrency[0], itemDetails);
+    if (!success) {
+        await interaction.editReply(`Something went wrong while deducting your currency. Please try again later.`);
+        return;
+    }
+
+    // Process item addition
+    const updateItemResult = await addItemToInventory(userId, username, itemDetails);
+    if (!updateItemResult) {
+        await interaction.editReply(`Something went wrong while adding the item to your inventory. Please try again later.`);
+        return;
+    }
+
+    // Send success messages
+    const successMessage = `You have successfully bought **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency})`;
+    await interaction.editReply(successMessage);
+    await interaction.channel.send(
+        `<@${userId}> Buy **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency})`
+    );
+};
+
+const deductCurrency = async (userId, userCurrency, itemDetails) => {
+    const newAmount = userCurrency.amount - itemDetails.price;
+    return await updateUserItem(
+        { id: userId },
+        {
+            id: userCurrency.id,
+            material: userCurrency.material
+        },
+        userCurrency.amount,
+        newAmount
+    );
+};
+
+const addItemToInventory = async (userId, username, itemDetails) => {
+    const existingItem = await getUserItem({
+        userId: userId,
+        itemId: itemDetails.material_id
+    });
+
+    if (existingItem?.length) {
+        const success = await updateUserItem(
+            { id: userId },
+            {
+                id: existingItem[0].id,
+                material: existingItem[0].material
+            },
+            existingItem[0].amount,
+            existingItem[0].amount + itemDetails.material_amount
+        );
+        if (!success) return false;
+        return true;
+    } else {
+        const success = await insertUserItem(
+            { id: userId, username: username },
+            { id: itemDetails.material_id, name: itemDetails.name },
+            itemDetails.material_amount
+        );
+        if (!success) return false;
+        return true;
+    }
+};
+
+const handlePurchaseError = async (interaction, error) => {
+    let errorMessage = 'An unexpected error occurred. Please try again later.';
+    if (interaction.deferred) {
+        await interaction.editReply(errorMessage);
+    } else {
+        await interaction.reply({ content: errorMessage, ephemeral: true });
+    }
+};
+
 // --- Command Export ---
 module.exports = {
     handleShopCommand,
-    handleShopButtonClick
+    handleShopButtonClick,
+    handleShopSelectMenuClick
 };
