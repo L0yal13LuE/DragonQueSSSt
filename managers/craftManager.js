@@ -21,7 +21,7 @@ const handleCraftCommand = async (message, args) => {
         // console.log("args.items: ", args.items);
 
         // Add items as fields to the embed using the new parameters
-        const lettesArray = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+        const lettesArray = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
         args.items.forEach((item, index) => {
             // Add the item as a field to the embed
             let itemLetter = lettesArray[index];
