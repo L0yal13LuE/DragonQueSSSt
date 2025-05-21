@@ -206,6 +206,9 @@ client.on('messageCreate', async (message) => {
             case 'bag':
                 commandHandlers.handleBagCommand(message);
                 break;
+            case 'bag_dm':
+                commandHandlers.handleBagDM(client, message);
+                break;
             case 'monster':
                 commandHandlers.handleMonsterCommand(message, currentMonsterStateRef.current); // Pass current state
                 break;
