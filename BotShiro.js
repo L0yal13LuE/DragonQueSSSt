@@ -26,6 +26,7 @@ const { shopSettings, craftSettings } = require('./managers/shopWorkshop.js');
 const { handleShopCommand, handleShopButtonClick } = require('./managers/shopManager.js');
 const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
+const { handleSendCommand } = require('./slashCommandHandler.js');
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -242,22 +243,34 @@ client.on('messageCreate', async (message) => {
 });
 
 // set discord `client` event listener
-client.on(Events.InteractionCreate, async interaction => {
-    try {
-        console.error("Events.InteractionCreate : start!", interaction.customId);
-        if (interaction.isButton() && interaction.customId.startsWith('buy_') && shopWorkShopSettings) {
-            console.log("[Shop] Click Button : ", interaction.customId);
-            await handleShopButtonClick(interaction, shopWorkShopSettings);
-            return;
-        }
-        if (interaction.isButton() && interaction.customId.startsWith('craft_') && craftWorkShopSettings) {
-            console.log("[Craft] Click Button : ", interaction.customId);
-            await handleCraftButtonClick(interaction, craftWorkShopSettings);
-            return;
-        }
-    } catch (error) {
-        console.error("Events.InteractionCreate : Failed!", error);
+client.on(Events.InteractionCreate, async (interaction) => {
+  try {
+    console.error("Events.InteractionCreate : start!", interaction.customId);
+    if (
+      interaction.isButton() &&
+      interaction.customId.startsWith("buy_") &&
+      shopWorkShopSettings
+    ) {
+      console.log("[Shop] Click Button : ", interaction.customId);
+      await handleShopButtonClick(interaction, shopWorkShopSettings);
+      return;
     }
+    if (
+      interaction.isButton() &&
+      interaction.customId.startsWith("craft_") &&
+      craftWorkShopSettings
+    ) {
+      console.log("[Craft] Click Button : ", interaction.customId);
+      await handleCraftButtonClick(interaction, craftWorkShopSettings);
+      return;
+    }
+    if (interaction.commandName === "send") {
+      await handleSendCommand(interaction);
+      return;
+    }
+  } catch (error) {
+    console.error("Events.InteractionCreate : Failed!", error);
+  }
 });
 
 // --- Login to Discord ---
