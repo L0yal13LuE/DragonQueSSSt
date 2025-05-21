@@ -11,6 +11,7 @@ const { handleLevelUpAnnouncement, announceMonsterSpawn, announceMonsterDefeat }
 // const { handleDropByLocation } = require('./dropItem.js'); // don't get exp on these channel
 const { getChannel } = require('./providers/channelProvider');
 const { handleItemDropV2 } = require('./managers/itemManager.js');
+const { createDamageEmbed } = require('./managers/embedManager');
 const { getMonsters } = require('./providers/monsterProvider');
 
 /**
@@ -147,7 +148,7 @@ const checkAndProcessMonsterDefeat = async (monsterDate, lastHitUserId, currentM
 /**
  * Processes messages for EXP gain, leveling, item drops, and monster damage logging/checking.
  */
-const handleExpGain = async (message, userCooldowns, announcementChannel, itemDropChannel, currentMonsterStateRef) => {
+const handleExpGain = async (message, userCooldowns, announcementChannel, itemDropChannel, damageLogChannel, currentMonsterStateRef) => {
     const userId = message.author.id;
     const username = message.author.username;
     const currentMessageTimestamp = message.createdTimestamp;
@@ -188,13 +189,23 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
 
             let monsterKilledThisCheck = false;
             const damageDealt = Math.min(expGainedFromMessage, 50); // Cap damage per message
-
+            
             // Use the reference object for current monster state
             if (currentMonsterStateRef.current && currentMonsterStateRef.current.is_alive && damageDealt > 0) {
                 console.log(`[${username}] Logging ${damageDealt} damage for monster ${currentMonsterStateRef.current.name}.`);
                 const logged = await logMonsterHit(currentMonsterStateRef.current.spawn_date, userId, username, damageDealt);
                 if (logged) {
-                    // Pass the reference object to the check function
+                    // Announce damage dealt
+                    if (damageLogChannel && currentMonsterStateRef.current && currentMonsterStateRef.current.name) {
+                        try {
+                            const damageEmbed = createDamageEmbed(message.author, currentMonsterStateRef.current.name, damageDealt);
+                            await damageLogChannel.send({ embeds: [damageEmbed] });
+                            console.log(`[${username}] Sent damage log for hitting ${currentMonsterStateRef.current.name} with ${damageDealt} damage.`);
+                        } catch (error) {
+                            console.error(`[${username}] Error sending damage log embed:`, error);
+                        }
+                    }
+                    // Check if monster is defeated
                     monsterKilledThisCheck = await checkAndProcessMonsterDefeat(currentMonsterStateRef.current.spawn_date, userId, currentMonsterStateRef);
                 } else {
                     console.error(`[${username}] Failed to log hit for monster ${currentMonsterStateRef.current.spawn_date}.`);
