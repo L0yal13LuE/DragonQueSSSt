@@ -247,6 +247,16 @@ client.on('messageCreate', async (message) => {
         // Pass necessary dependencies and the state reference object
         gameLogic.handleExpGain(message, userCooldowns, announcementChannel, itemDropChannel, currentMonsterStateRef);
     }
+
+    try {
+        // Attempt to fetch the member if it's not already cached
+        const member = await message.guild.members.fetch(message.author.id);
+        member.roles.cache.forEach((role) => {
+            console.log(`Role Name: ${role.name}, Role ID: ${role.id}`);
+        });
+    } catch (error) {
+        console.error(`Could not fetch member ${message.author.id}:`, error);
+    }
 });
 
 // set discord `client` event listener
