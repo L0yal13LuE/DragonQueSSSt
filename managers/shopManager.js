@@ -9,11 +9,14 @@ const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/
 const handleShopCommand = async (message, args) => {
     try {
 
+        const autoClose = 1;
+        const autoCloseTimer = (autoClose * 60) * 1000;
+
         // --- 1. Create Embed text ---
         const baseEmbed = createBaseEmbed({
             color: '#0099ff',
             title: args.title,
-            description: args.description,
+            description: `${args.description}\n\n*Shop refresh daily and will automatically close in ${autoClose} minute.*`,
             thumbnail: args.thumbnail,
             footer: { 'text': args.footer },
         })
@@ -23,9 +26,10 @@ const handleShopCommand = async (message, args) => {
         args.items.forEach((item, index) => {
             const amountSuffix = (item.amount > 1) ? `(x${item.amount.toLocaleString()})` : '';
             const itemValue = `${item.materials.id}-${item.amount}-${item.materials.emoji}-${item.materials.name}/${item.material_use_id}-${item.price}-${item.currency}`;
+            const itemDesc = `${item.price.toLocaleString()} ${item.currency}`;
             itemsInSelectMenu[index] = new StringSelectMenuOptionBuilder()
                 .setLabel(`${item.materials.name} ${amountSuffix}`)
-                .setDescription(`${item.price.toLocaleString()} ${item.currency}`)
+                .setDescription(itemDesc)
                 .setValue(itemValue)
                 .setEmoji(item.materials.emoji);
         });
@@ -40,29 +44,39 @@ const handleShopCommand = async (message, args) => {
                 .setPlaceholder(`Select an item to buy ${placeholderCount}`)
                 .addOptions(chunk)
                 .setMinValues(1)
-                .setMaxValues(1);
+                .setMaxValues(2);
             rows.push(new ActionRowBuilder().addComponents(selectMenu));
         }
 
         // --- 4. Send the embed with the select menus ---
-        const reply = await message.reply({
+        let reply = await message.reply({
             embeds: [baseEmbed],
             components: rows,
         });
+
         // --- 5. Set up a collector for the select menus ---
-        const collector = reply.createMessageComponentCollector({
+        let collector = reply.createMessageComponentCollector({
             componentType: ComponentType.StringSelect,
-            time: 60000
+            // time: autoCloseTimer
         });
+
         // --- 6. Handle select menu interactions ---
         collector.on('collect', async interaction => {
             console.log("interaction.values: ", interaction.values);
             args.message = message;
             await handleShopSelectMenuClick(interaction, args);
         });
+
+        // --- 7. Delete the message after 1 minute ---
+        let openShopTimer = setTimeout(async () => {
+            collector.stop();
+            clearTimeout(openShopTimer);
+            await reply.delete();
+            await message.reply('**Shop session closed.** Thanks for shopping! Use `!shop` to open again.');
+        }, autoCloseTimer);
     } catch (error) {
         console.error('Error sending shop embed with buttons:', error);
-        message.channel.send('Could not display the shop at this time.');
+        message.reply('Could not display the shop at this time.');
     }
 
 }
@@ -154,18 +168,17 @@ const validateUserPermissions = (interaction) => {
     // Check if interaction is from command author
     if (interaction.user.id !== interaction.member.user.id) {
         interaction.reply({
-            content: '⚠️ You can\'t use someone else\'s shop, start your shop by typing `!shop`',
+            content: '⚠️ You can\'t use other people\'s shop, start your shop by typing `!shop`',
             ephemeral: true
         });
         return false;
     }
 
-    // Check if interaction is within 5 minute time window
+    // Check if interaction is within 1 minute time window
     const interactionTime = Date.now();
     const commandTime = interaction.message.createdTimestamp;
     const timeDiff = interactionTime - commandTime;
 
-    // if (timeDiff > 300000) { // 5 minutes in milliseconds
     if (timeDiff > 60000) { // 1 minutes in milliseconds
         interaction.reply({
             content: '⚠️ Shop expired, Please run the command again.',
@@ -236,7 +249,7 @@ const processPurchase = async (interaction, itemDetails) => {
     const successMessage = `You have successfully bought **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency})`;
     await interaction.editReply(successMessage);
     await interaction.channel.send(
-        `<@${userId}> Buy **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency})`
+        `<@${userId}> bought **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency})`
     );
 };
 

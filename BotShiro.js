@@ -97,12 +97,17 @@ client.once('ready', async () => {
     }
 
     // Spawn shop npc, spawn at certain channel but available on every channel
-    shopWorkShopSettings = await shopSettings('1367030652834283590', client);
-    if (shopWorkShopSettings) {
-        console.log(`[Shop] found: ${shopWorkShopSettings.title}`);
-    } else {
-        console.log(`[Shop] not found: ${shopWorkShopSettings}`);
+    async function refreshShopSettings() {
+        shopWorkShopSettings = await shopSettings('1367030652834283590', client);
+        if (shopWorkShopSettings) {
+            console.log(`[Shop] found/refreshed: ${shopWorkShopSettings.title}`);
+        } else {
+            console.log(`[Shop] not found: ${shopWorkShopSettings}`);
+            shopWorkShopSettings = null;
+        }
     }
+    refreshShopSettings(); // Initial spawn
+    setInterval(refreshShopSettings, 60 * 60 * 1000); // Refresh every hour
 
     // Spawn craft npc
     craftWorkShopSettings = await craftSettings('!craft', client);
@@ -207,7 +212,7 @@ client.on('messageCreate', async (message) => {
                 commandHandlers.handleBagCommand(message);
                 break;
             case 'bag_dm':
-                commandHandlers.handleBagDM(client, message);
+                // commandHandlers.handleBagDM(client, message);
                 break;
             case 'monster':
                 commandHandlers.handleMonsterCommand(message, currentMonsterStateRef.current); // Pass current state
@@ -225,7 +230,7 @@ client.on('messageCreate', async (message) => {
     else {
         // --- ADD BOT MENTION CHECK HERE ---
         // Check if the bot user was specifically mentioned (not @everyone or a role)
-        if (message.mentions.has(client.user)) {
+        if (message.mentions.has(client.user) && !message.mentions.everyone) {
             // Select a random cat reply
             const randomIndex = Math.floor(Math.random() * CONSTANTS.catReplies.length);
             const replyText = CONSTANTS.catReplies[randomIndex];
@@ -248,11 +253,6 @@ client.on('messageCreate', async (message) => {
 client.on(Events.InteractionCreate, async interaction => {
     try {
         console.error("Events.InteractionCreate : start!", interaction.customId);
-        // if (interaction.isStringSelectMenu() && interaction.customId.startsWith('shop_base') && shopWorkShopSettings) {
-        //     console.log("[Shop] Select choice : ", interaction.customId);
-        //     await handleShopSelectMenuClick(interaction, shopWorkShopSettings);
-        //     return;
-        // }
         if (interaction.isButton() && interaction.customId.startsWith('craft_') && craftWorkShopSettings) {
             console.log("[Craft] Click Button : ", interaction.customId);
             await handleCraftButtonClick(interaction, craftWorkShopSettings);

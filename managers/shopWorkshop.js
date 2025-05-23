@@ -4,6 +4,11 @@ const { getShop, getShopItems } = require('./../dbUtils');
 const { handleShopButtonClick } = require('./shopManager');
 const { handleCraftButtonClick } = require('./craftManager');
 
+const fs = require('fs');
+const { join } = require('path');
+
+const CACHE_MAT_SELL_DIR = join(__dirname, '../.cache');
+
 const shopSettings = async (channelId, client) => {
     try {
         if (!supabase) { console.error("[shopSettings] Supabase client not available."); return null; } // Or handle differently
@@ -30,7 +35,12 @@ const shopSettings = async (channelId, client) => {
             footer = shopData.footer || footer;
 
             // Get items in this shop
-            const shopItems = await getShopItems(shopData.id);
+            const shopItemCurrency = await getShopItems(shopData.id);
+            const shopMaterials = await getShopMaterialsForSell();
+            const shopItems = shopItemCurrency.concat(shopMaterials);
+
+            // console.log('Shop Items:', shopItems);
+            // console.log('Shop Materials:', shopMaterials);
 
             // Check if shopItems is not null and has items
             if (shopItems && shopItems.length > 0) {
@@ -160,28 +170,28 @@ const craftSettings = async (command, client) => {
 
             await Promise.all(craftSubCommand.map(async (item, index) => {
                 const letter = letters[index]; // Consistent letter assignment
-                
+
                 const { data: itemToCraft, error: craftSubCommandMainItemErr } = await supabase.from("materials")
                     .select("id,emoji,name")
                     .eq('is_active', true)
                     .eq("id", item.material_id)
                     .single();
-    
+
                 if (craftSubCommandMainItemErr) {
                     console.error("[Craft] Error fetching item to craft:", craftSubCommandMainItemErr);
                     return;
                 }
-    
+
                 // console.log("[Craft] sub-command: itemToCraft", itemToCraft);
-    
+
                 if (!itemToCraft) {
                     console.log("[Craft] No items for craft : itemToCraft", itemToCraft);
                     return;
                 }
-    
+
                 const materialsForItemToCraft = await getCraftSubCommandItems(item.id);
                 // console.log("[Craft] materialsForItemToCraft:", materialsForItemToCraft);
-    
+
                 fieldsItems[index] = {
                     id: itemToCraft.id,
                     emoji: itemToCraft.emoji,
@@ -191,7 +201,7 @@ const craftSettings = async (command, client) => {
                     materials: materialsForItemToCraft
                 };
             }));
-            
+
             // Now fieldsItems is populated with all items
             const craftSettingObj = {
                 channelId: '0',
@@ -200,10 +210,6 @@ const craftSettings = async (command, client) => {
                 items: fieldsItems
             };
 
-            // console.log("[Craft] settings object:", craftSettingObj);
-
-            // return shop settings object because we need to use it in the main file 
-            // to set the event command listener
             return craftSettingObj;
         } else {
             console.log('[Craft] No items for craft', craftCommand);
@@ -214,6 +220,69 @@ const craftSettings = async (command, client) => {
         return false;
     }
 };
+
+const getShopMaterialsForSell = async () => {
+    const date = new Date();
+    const today = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+    const cacheDir = CACHE_MAT_SELL_DIR;
+    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+    const cacheFile = join(cacheDir, `${today}_shop_materials.json`);
+
+    try {
+        if (fs.existsSync(cacheFile)) {
+            const data = fs.readFileSync(cacheFile);
+            console.log('[Shop] using cached json');
+            return JSON.parse(data);
+        }
+
+        const { data: rarity1Data, error: rarity1Error } = await supabase.rpc('get_materials_by_rarity_1');
+        const { data: rarity2Data, error: rarity2Error } = await supabase.rpc('get_materials_by_rarity_2');
+        const { data: rarity3Data, error: rarity3Error } = await supabase.rpc('get_materials_by_rarity_3');
+
+        let combinedResults = [];
+        if (rarity1Error || rarity2Error || rarity3Error) {
+            console.error('Error fetching materials:', rarity1Error || rarity2Error || rarity3Error);
+        } else {
+            combinedResults = [...rarity1Data, ...rarity2Data, ...rarity3Data];
+        }
+
+        const buildPrice = (rarity_id) => {
+            switch (rarity_id) {
+                case 1:
+                    return 10;
+                case 2:
+                    return 15;
+                case 3:
+                    return 30;
+                default:
+                    return 10;
+            }
+        };
+
+        if (combinedResults && combinedResults.length <= 0) return [];
+        const returnData = combinedResults.map((row) => {
+            const ID = Math.floor(1000 + Math.random() * 9000);
+            return {
+                id: ID,
+                shop_id: 1,
+                price: buildPrice(row.rarity_id), // use amount
+                currency: 'Como',
+                created_at: '2025-05-19T12:14:50.611711+00:00',
+                is_active: true,
+                material_id: row.id,
+                amount: 1,
+                material_use_id: 68, // use Como
+                materials: { id: row.id, name: row.name, emoji: row.emoji }
+            };
+        });
+        fs.writeFileSync(cacheFile, JSON.stringify(returnData));
+        console.log('[Shop] refresh data from database');
+        return returnData;
+    } catch (error) {
+        console.error('Error in getShopMaterialsForSell:', error);
+        return [];
+    }
+}
 
 module.exports = {
     shopSettings,
