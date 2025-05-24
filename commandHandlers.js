@@ -335,10 +335,14 @@ const handleBagPaginationCommand = async (message, isDM = false) => {
 		});
 
 		// auto delete after 5 minute
-        setTimeout(async () => {
+    setTimeout(async () => {
+        try {
             await replyMessage.delete();
-            await message.reply('**Bag closed.** Use `!bag` to open again.\n*If you want to keep your items private, use `!bag_dm` instead (please allow dm in your settings)*');
-        }, (autoCloseTimer));
+        } catch (errorDel) {
+            console.error('Error deleting message:', errorDel);
+        }
+        await message.reply('**Bag closed.** Use `!bag` to open again.\n*If you want to keep your items private, use `!bag_dm` instead (please allow dm in your settings)*');
+    }, (autoCloseTimer));
 	} catch (error) {
 		console.error('Error while handling !bag pagination command:', error);
 	}

@@ -72,13 +72,13 @@ const handleShopCommand = async (message, args) => {
         let rows = await buildRowComponents(message, args);
 
         // --- 4. Send the embed with the select menus ---
-        const reply = await message.reply({
+        let reply = await message.reply({
             embeds: [baseEmbed],
             components: rows,
         });
 
         // --- 5. Set up a collector for the select menus ---
-        const collector = reply.createMessageComponentCollector({
+        let collector = reply.createMessageComponentCollector({
             componentType: ComponentType.StringSelect,
             filter: (i) => i.user.id === message.author.id,
             time: (autoCloseTimer - 30000)
@@ -88,7 +88,7 @@ const handleShopCommand = async (message, args) => {
         collector.on('collect', async interaction => {
             // console.log("interaction.values: ", interaction.values);
             args.message = message;
-            const result = await handleShopSelectMenuClick(interaction, args);
+            let result = await handleShopSelectMenuClick(interaction, args);
             if (result) {
                 // force refresh the choices after finish purchases
                 rows = await buildRowComponents(message, args);
@@ -100,7 +100,11 @@ const handleShopCommand = async (message, args) => {
 
         // --- 7. Delete the message after 1 minute ---
         setTimeout(async () => {
-            await reply.delete();
+            try {
+                await reply.delete();
+            } catch (errorDel) {
+                console.error('Error deleting message:', errorDel);
+            }
             await message.reply('**Shop session closed.** Thanks for shopping! Use `!shop` to open again.');
         }, autoCloseTimer);
     } catch (error) {
