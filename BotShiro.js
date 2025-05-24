@@ -224,7 +224,7 @@ client.on('messageCreate', async (message) => {
             // case 'leaderboard': // TODO: still need to be implemented more
             //     handleLeaderboardCommand(message, client);
             //     break;
-            case 'shop_':
+            case 'shop':
                 if (shopWorkShopSettings) {
                     handleShopCommand(message, shopWorkShopSettings);
                 }
