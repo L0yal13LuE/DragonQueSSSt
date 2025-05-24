@@ -109,6 +109,7 @@ const handleBagCommand = async (message) => {
   try {
     const userItems = await getUserItem({
       userId: message.author.id,
+      amount: 1
     });
 
     const itemList =

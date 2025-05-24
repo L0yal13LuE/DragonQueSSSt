@@ -6,7 +6,10 @@ const {
 
 const { getMaterial, getUserItemV2 } = require("./providers/materialProvider");
 
-const { deductItemFromUser, addItemtoUser } = require("./managers/materialManager");
+const {
+  deductItemFromUser,
+  addItemtoUser,
+} = require("./managers/materialManager");
 
 const handleSendCommand = async (interaction) => {
   // Check if this interaction is the submission or not
@@ -26,14 +29,9 @@ const fetchUserItem = async (interaction) => {
 
   let allUserItemsData = null;
 
-  // 1. Check cache for the user's entire bag
-  const cachedBag = await getCachedUserBag(userId);
+  if (itemNameInput === "") {
+    await deleteUserBagCache(userId);
 
-  if (cachedBag) {
-    allUserItemsData = cachedBag;
-  } else {
-    // 2. Cache miss: Fetch all items (amount >= 1) for the user from DB
-    // Pass page 0 and limit -1 to fetch all items according to our modification in getUserItem
     const result = await getUserItemV2({ userId: userId, amount: 1 }, 0, -1);
 
     if (result.error || !result.data) {
@@ -47,6 +45,29 @@ const fetchUserItem = async (interaction) => {
     allUserItemsData = result.data;
     // Save the fetched data to cache
     saveUserBagCache(userId, allUserItemsData);
+  } else {
+    // 1. Check cache for the user's entire bag
+    const cachedBag = await getCachedUserBag(userId);
+
+    if (cachedBag) {
+      allUserItemsData = cachedBag;
+    } else {
+      // 2. Cache miss: Fetch all items (amount >= 1) for the user from DB
+      // Pass page 0 and limit -1 to fetch all items according to our modification in getUserItem
+      const result = await getUserItemV2({ userId: userId, amount: 1 }, 0, -1);
+
+      if (result.error || !result.data) {
+        console.error(
+          `[Autocomplete] Error fetching bag for user ${userId} for cache:`,
+          result.error || "No data"
+        );
+        await interaction.respond([]); // Respond with empty if DB fetch fails
+        return;
+      }
+      allUserItemsData = result.data;
+      // Save the fetched data to cache
+      saveUserBagCache(userId, allUserItemsData);
+    }
   }
 
   if (!allUserItemsData || allUserItemsData.length === 0) {
