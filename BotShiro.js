@@ -120,7 +120,7 @@ client.once('ready', async () => {
 
     // Send Online Announcement
     if (announcementChannel) {
-        //await announcements.sendOnlineAnnouncement(announcementChannel);
+        await announcements.sendOnlineAnnouncement(announcementChannel);
     } else {
         console.warn("Announcement channel unavailable, cannot send online announcement.");
     }
