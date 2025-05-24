@@ -1,5 +1,6 @@
 require('dotenv').config({
     path: {
+        blue: '.env.blue',
         development: '.env',
         staging: '.env.staging',
         production: '.env.production'
@@ -26,11 +27,13 @@ const { shopSettings, craftSettings } = require('./managers/shopWorkshop.js');
 const { handleShopCommand, handleShopSelectMenuClick } = require('./managers/shopManager.js');
 const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
+const { handleSendCommand } = require('./slashCommandHandler.js');
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
 const ANNOUNCEMENT_CHANNEL_ID = process.env.ANNOUNCEMENT_CHANNEL_ID; // For level-ups ONLY
 const ITEM_DROP_CHANNEL_ID = process.env.ITEM_DROP_CHANNEL_ID; // For item-drop- ONLY
+const DAMAGE_LOG = process.env.DAMAGE_LOG; // For item-drop- ONLY
 
 const CHANNEL_ID_1 = ANNOUNCEMENT_CHANNEL_ID; 
 
@@ -59,6 +62,7 @@ const client = new Client({
 const userCooldowns = new Collection();
 let announcementChannel = null;
 let itemDropChannel = null;
+let damageLogChannel = null;
 
 // Use a reference object for currentMonsterState so modules can update it
 let currentMonsterStateRef = { current: null };
@@ -78,6 +82,24 @@ client.once('ready', async () => {
             if (announcementChannel) console.log(`Announcement channel found: ${announcementChannel.name}`);
             else console.error(`Could not find announcement channel: ${ANNOUNCEMENT_CHANNEL_ID}`);
         } catch (error) { console.error(`Error fetching announcement channel:`, error); announcementChannel = null; }
+    }
+
+    // Fetch Channel Objects
+    if (ITEM_DROP_CHANNEL_ID) {
+        try {
+            itemDropChannel = await client.channels.fetch(ITEM_DROP_CHANNEL_ID);
+            if (itemDropChannel) console.log(`Item drop channel found: ${itemDropChannel.name}`);
+            else console.error(`Could not find item drop channel: ${ITEM_DROP_CHANNEL_ID}`);
+        } catch (error) { console.error(`Error fetching item drop channel:`, error); itemDropChannel = null; }
+    }
+
+    // Fetch Channel Objects
+    if (DAMAGE_LOG) {
+        try {
+            damageLogChannel = await client.channels.fetch(DAMAGE_LOG);
+            if (damageLogChannel) console.log(`Item damage log channel found: ${damageLogChannel.name}`);
+            else console.error(`Could not find damage log channel: ${DAMAGE_LOG}`);
+        } catch (error) { console.error(`Error fetching damage log channel:`, error); damageLogChannel = null; }
     }
 
     // Fetch Channel Objects
@@ -245,7 +267,7 @@ client.on('messageCreate', async (message) => {
         // --- END BOT MENTION CHECK ---
 
         // Pass necessary dependencies and the state reference object
-        gameLogic.handleExpGain(message, userCooldowns, announcementChannel, itemDropChannel, currentMonsterStateRef);
+        gameLogic.handleExpGain(message, userCooldowns, announcementChannel, itemDropChannel, damageLogChannel, currentMonsterStateRef);
     }
 
     // Role Logging
@@ -260,17 +282,34 @@ client.on('messageCreate', async (message) => {
 });
 
 // set discord `client` event listener
-client.on(Events.InteractionCreate, async interaction => {
-    try {
-        console.error("Events.InteractionCreate : start!", interaction.customId);
-        if (interaction.isButton() && interaction.customId.startsWith('craft_') && craftWorkShopSettings) {
-            console.log("[Craft] Click Button : ", interaction.customId);
-            await handleCraftButtonClick(interaction, craftWorkShopSettings);
-            return;
-        }
-    } catch (error) {
-        console.error("Events.InteractionCreate : Failed!", error);
+client.on(Events.InteractionCreate, async (interaction) => {
+  try {
+    console.error("Events.InteractionCreate : start!", interaction.customId);
+    //if (
+    //  interaction.isButton() &&
+    //  interaction.customId.startsWith("buy_") &&
+    //  shopWorkShopSettings
+    //) {
+    //  console.log("[Shop] Click Button : ", interaction.customId);
+    //  await handleShopButtonClick(interaction, shopWorkShopSettings);
+    //  return;
+    //}
+    if (
+      interaction.isButton() &&
+      interaction.customId.startsWith("craft_") &&
+      craftWorkShopSettings
+    ) {
+      console.log("[Craft] Click Button : ", interaction.customId);
+      await handleCraftButtonClick(interaction, craftWorkShopSettings);
+      return;
     }
+    if (interaction.commandName === "send") {
+      await handleSendCommand(interaction);
+      return;
+    }
+  } catch (error) {
+    console.error("Events.InteractionCreate : Failed!", error);
+  }
 });
 
 // --- Login to Discord ---

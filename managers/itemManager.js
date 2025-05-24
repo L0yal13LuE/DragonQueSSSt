@@ -9,7 +9,7 @@ const { getConfig } = require("../providers/configProvider");
 const { createBaseEmbed } = require("./embedManager");
 
 let baseDropRate = 0.15;
-const handleItemDropV2 = async (message, channel) => {  
+const handleItemDropV2 = async (message, channel) => {
   const channelId = message.channel.id;
   if (!supabase) {
     console.warn("[ItemDropV2] Supabase client not available.");
