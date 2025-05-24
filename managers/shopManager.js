@@ -44,7 +44,7 @@ const handleShopCommand = async (message, args) => {
                 .setPlaceholder(`Select an item to buy ${placeholderCount}`)
                 .addOptions(chunk)
                 .setMinValues(1)
-                .setMaxValues(2);
+                .setMaxValues(1);
             rows.push(new ActionRowBuilder().addComponents(selectMenu));
         }
 
