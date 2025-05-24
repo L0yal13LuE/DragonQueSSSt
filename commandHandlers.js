@@ -115,11 +115,11 @@ const handleBagCommand = async (message) => {
     const itemList =
       Object.values(userItems).length > 0
         ? Object.values(userItems)
-            .map(
-              (value) =>
-                `${value.material.emoji} ${value.material.name}: ${value.amount}`
-            )
-            .join("\n")
+          .map(
+            (value) =>
+              `${value.material.emoji} ${value.material.name}: ${value.amount}`
+          )
+          .join("\n")
         : "Your bag is empty... Chat to find some items!";
 
     const bagEmbed = createBagEmbed(message.author, itemList);
@@ -207,9 +207,50 @@ const handleMonsterCommand = async (message, currentMonsterState) => {
   }
 };
 
+const handleBagDM = async (client, message) => {
+  try {
+    // Send a "thinking" message that will be updated
+    // const thinkingMsg = await message.channel.send(`🤔 *${client.user.username} is checking ${message.author.username}'s bag...*`);
+
+    // Simulate thinking time
+    // await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Create an embed for the bag contents
+    const bagEmbed = new EmbedBuilder()
+      .setColor(0x0099FF)
+      .setTitle(`Your Bag`)
+      .setDescription("**🎒 Your Bag Contents:**\n\n• Health Potion x3\n• Gold Coins x250\n• Iron Sword (Durability: 85%)\n• Magic Scroll of Fireball\n• Quest Item: Ancient Relic")
+      .setFooter({ text: 'This is bot message, only you can see this message.' });
+
+    // Send the bag contents privately via DM
+    const dmMessage = await message.author.send({
+      embeds: [bagEmbed]
+    });
+
+    // Update the original message to indicate the bag was sent privately
+    const thinkingMsg = await message.channel.send(`✅ ${message.author}, I've sent your bag contents to your DMs!`);
+    // await thinkingMsg.edit(`✅ ${message.author}, I've sent your bag contents to your DMs!`);
+
+
+  } catch (error) {
+
+    // Check if the error is because DMs are disabled
+    if (error.code === 50007) { // Cannot send messages to this user
+      message.channel.send(`${message.author}, I couldn't send you a DM 😭\nPlease enable direct messages from server members and try again.`).then(msg => {
+        setTimeout(() => msg.delete().catch(err => console.error(err)), 10000);
+      });
+    } else {
+      message.channel.send('There was an error processing your request.').then(msg => {
+        setTimeout(() => msg.delete().catch(err => console.error(err)), 5000);
+      });
+    }
+  }
+};
+
 module.exports = {
   handleRankCommand,
   handleChatCommand,
   handleBagCommand,
   handleMonsterCommand,
+  handleBagDM
 };

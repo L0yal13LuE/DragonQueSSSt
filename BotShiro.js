@@ -24,7 +24,7 @@ const { handleMaterialCommand } = require('./managers/materialManager.js');
 // -- Addition Command Handlers ---
 const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
 const { shopSettings, craftSettings } = require('./managers/shopWorkshop.js');
-const { handleShopCommand, handleShopButtonClick } = require('./managers/shopManager.js');
+const { handleShopCommand, handleShopSelectMenuClick } = require('./managers/shopManager.js');
 const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
 const { handleSendCommand } = require('./slashCommandHandler.js');
@@ -119,12 +119,17 @@ client.once('ready', async () => {
     }
 
     // Spawn shop npc, spawn at certain channel but available on every channel
-    shopWorkShopSettings = await shopSettings('1367030652834283590', client);
-    if (shopWorkShopSettings) {
-        console.log(`[Shop] found: ${shopWorkShopSettings.title}`);
-    } else {
-        console.log(`[Shop] not found: ${shopWorkShopSettings}`);
+    async function refreshShopSettings() {
+        shopWorkShopSettings = await shopSettings('1367030652834283590', client);
+        if (shopWorkShopSettings) {
+            console.log(`[Shop] found/refreshed: ${shopWorkShopSettings.title}`);
+        } else {
+            console.log(`[Shop] not found: ${shopWorkShopSettings}`);
+            shopWorkShopSettings = null;
+        }
     }
+    refreshShopSettings(); // Initial spawn
+    setInterval(refreshShopSettings, 60 * 60 * 1000); // Refresh every hour
 
     // Spawn craft npc
     craftWorkShopSettings = await craftSettings('!craft', client);
@@ -228,6 +233,9 @@ client.on('messageCreate', async (message) => {
             case 'bag':
                 commandHandlers.handleBagCommand(message);
                 break;
+            case 'bag_dm':
+                // commandHandlers.handleBagDM(client, message); // just example for DM to user
+                break;
             case 'monster':
                 commandHandlers.handleMonsterCommand(message, currentMonsterStateRef.current); // Pass current state
                 break;
@@ -244,7 +252,7 @@ client.on('messageCreate', async (message) => {
     else {
         // --- ADD BOT MENTION CHECK HERE ---
         // Check if the bot user was specifically mentioned (not @everyone or a role)
-        if (message.mentions.has(client.user)) {
+        if (message.mentions.has(client.user) && !message.mentions.everyone) {
             // Select a random cat reply
             const randomIndex = Math.floor(Math.random() * CONSTANTS.catReplies.length);
             const replyText = CONSTANTS.catReplies[randomIndex];
@@ -261,21 +269,31 @@ client.on('messageCreate', async (message) => {
         // Pass necessary dependencies and the state reference object
         gameLogic.handleExpGain(message, userCooldowns, announcementChannel, itemDropChannel, damageLogChannel, currentMonsterStateRef);
     }
+
+    // Role Logging
+    try {
+        // Attempt to fetch the member if it's not already cached
+        const member = await message.guild.members.fetch(message.author.id);
+        // Log the member's roles
+        member.roles.cache.forEach((role) => { console.log(`Role Name: ${role.name}, Role ID: ${role.id}`); });
+    } catch (error) {
+        console.error(`Could not fetch member ${message.author.id}:`, error);
+    }
 });
 
 // set discord `client` event listener
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
     console.error("Events.InteractionCreate : start!", interaction.customId);
-    if (
-      interaction.isButton() &&
-      interaction.customId.startsWith("buy_") &&
-      shopWorkShopSettings
-    ) {
-      console.log("[Shop] Click Button : ", interaction.customId);
-      await handleShopButtonClick(interaction, shopWorkShopSettings);
-      return;
-    }
+    //if (
+    //  interaction.isButton() &&
+    //  interaction.customId.startsWith("buy_") &&
+    //  shopWorkShopSettings
+    //) {
+    //  console.log("[Shop] Click Button : ", interaction.customId);
+    //  await handleShopButtonClick(interaction, shopWorkShopSettings);
+    //  return;
+    //}
     if (
       interaction.isButton() &&
       interaction.customId.startsWith("craft_") &&

@@ -8,19 +8,18 @@ const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/
 // handle when user run !craft command
 const handleCraftCommand = async (message, args) => {
     try {
-        // --- Create Embed with Items ---
-        // Create a base embed with title, description, thumbnail, and footer
+
+        const autoClose = 5;
+        const autoCloseTimer = (autoClose * 60) * 1000;
+
+        // --- 1. Create Embed with Items ---
         const baseEmbed = createBaseEmbed({
             color: '#0099ff',
             title: args.title,
             description: args.description,
-            //thumbnail: args.thumbnail,
-            //footer: { 'text': args.footer } : null,
         });
 
-        // console.log("args.items: ", args.items);
-
-        // Add items as fields to the embed using the new parameters
+        // ---- 2. Add items as fields to the embed using the new parameters
         const lettesArray = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
         args.items.forEach((item, index) => {
             // Add the item as a field to the embed
@@ -35,21 +34,16 @@ const handleCraftCommand = async (message, args) => {
             baseEmbed.addFields(mainrow);
         });
 
-        // --- Create Buttons for each item ---
+        // --- 3. Create Buttons for each item ---
         const rows = [];
         let currentRow = new ActionRowBuilder();
-
         args.items.forEach((item, index) => {
             const uniqueItemId = `${item.name}`;
             let itemLetter = lettesArray[index];
             const button = new ButtonBuilder()
-                // Create a unique custom ID for the button, based on the item name
-                // .setCustomId(`craft_${uniqueItemId.replace(/\s+/g, '_')}`)
-                // .setLabel(`Buy ${item.emoji} ${item.name}`) // Button text
                 .setCustomId(`craft_${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}`)
                 .setLabel(itemLetter) // Button text
                 .setStyle(ButtonStyle.Primary); // Use a primary button style
-            // .setStyle(ButtonStyle.Secondary); // Use a primary button style
 
             // Add button to the current row
             currentRow.addComponents(button);
@@ -63,13 +57,21 @@ const handleCraftCommand = async (message, args) => {
             }
         });
 
-        await message.reply({
+        // --- 4. Send Embed with Buttons ---
+        let reply = await message.reply({
             embeds: [baseEmbed],
             components: rows, // Attach the action rows containing the buttons
         });
+
+        // --- 5. Delete the message after 5 minute ---
+        let openCrafTimer = setTimeout(async () => {
+            clearTimeout(openCrafTimer);
+            await reply.delete();
+            await message.reply('**Crafting session closed.** Use `!craft` to start again!');
+        }, autoCloseTimer);
     } catch (error) {
         console.error('Error sending shop embed with buttons:', error);
-        message.channel.send('Could not display the shop at this time.');
+        message.reply('Could not display the shop at this time.');
     }
 }
 
