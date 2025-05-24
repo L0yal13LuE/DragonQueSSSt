@@ -42,12 +42,12 @@ const handleCraftCommand = async (message, args) => {
         });
 
         // --- 3. Create Buttons for each item ---
-        const rows = [];
-        const currentRow = new ActionRowBuilder();
+        let rows = [];
+        let currentRow = new ActionRowBuilder();
         args.items.forEach((item, index) => {
-            const uniqueItemId = `${item.name}`;
+            // const uniqueItemId = `${item.name}`;
             let itemLetter = lettesArray[index];
-            const button = new ButtonBuilder()
+            let button = new ButtonBuilder()
                 .setCustomId(`craft_${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}`)
                 .setLabel(itemLetter) // Button text
                 .setStyle(ButtonStyle.Primary); // Use a primary button style
@@ -65,15 +65,19 @@ const handleCraftCommand = async (message, args) => {
         });
 
         // --- 4. Send Embed with Buttons ---
-        const reply = await message.reply({
+        let reply = await message.reply({
             embeds: [baseEmbed],
             components: rows, // Attach the action rows containing the buttons
         });
 
         // --- 5. Delete the message after 5 minute ---
-        const openCrafTimer = setTimeout(async () => {
+        let openCrafTimer = setTimeout(async () => {
             clearTimeout(openCrafTimer);
-            await reply.delete();
+            try {
+                await reply.delete();
+            } catch (errorDel) {
+                console.error('Error deleting message:', errorDel);
+            }
             await message.reply('**Crafting session closed.** Use `!craft` to start again!');
         }, autoCloseTimer);
     } catch (error) {
