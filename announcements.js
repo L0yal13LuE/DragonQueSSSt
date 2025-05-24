@@ -10,7 +10,7 @@ const sendOnlineAnnouncement = async (announcementChannel) => {
         console.error('Announcement channel not found. Cannot send online announcement.');
         return;
     }
-    const onlineMessage = `☀️ **Gamers, wake up!** @everyone\nYour RPG bot is **online and ready to play**! ✨\nGo collect EXP in the city and resources area to earn new levels, items, and resources! 🔥\nType \`!bag\` to see your items, \`!level\` to see your level, and \`!monster\` to see the monsters! 🎯\nIt's time to **start your adventure!** 🚀`;
+    const onlineMessage = `☀️ **Gamers, wake up!** @everyone\nYour RPG bot is **online and ready to play**! ✨\nGo collect EXP in the city and resources area to earn new levels, items, and resources! 🔥\nType \`!bag\` to see your items, \`!level\` to see your level, and \`!monster\` to see the monsters! 🎯\nUse \`!craft\` to craft items, \`!shop\` to buy items, and \`/send\` to trade with friends!\nIt's time to **start your adventure!**, Click profile to learn more! 🚀`;
     try {
         await announcementChannel.send(onlineMessage);
         console.log('Bot online announcement sent.');
