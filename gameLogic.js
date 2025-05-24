@@ -152,6 +152,9 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
     const username = message.author.username;
     const currentMessageTimestamp = message.createdTimestamp;
 
+    // Clean up discord message prevent using emoji or http images spamming
+    message.content = cleanDiscordMessage(message.content);
+
     const allowedChannelData = await getChannel({isGainExp: true});
     const isChannelAllowed = allowedChannelData && allowedChannelData.some(channel => channel.id === message.channel.id);
 
@@ -324,6 +327,45 @@ const hourlyMonsterCheck = async (client, announcementChannel, currentMonsterSta
     } catch (error) {
         console.error("Error during hourly monster check:", error);
     }
+};
+
+  /**
+   * Cleans the input message by replacing Discord custom emojis, hyperlinks,
+   * markdown links (including attachments), and spoiler URLs with '0'.
+   * Standard Unicode emojis are also removed.
+   * @param {string} messageContent - The original message content from Discord.
+   * @returns {string} The cleaned message content.
+   */
+const cleanDiscordMessage = (messageContent) => {
+    let cleaned = messageContent;
+
+    // 1. Remove standard Unicode emojis
+    // This regex matches most common Unicode emojis.
+    // It's a broad match and might not cover all edge cases, but covers many.
+    cleaned = cleaned.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F200}-\u{1F25F}\u{1F300}-\u{1F5FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{2500}-\u{25FF}\u{2100}-\u{21FF}\u{2A00}-\u{2AFF}\u{2E00}-\u{2E7F}\u{3000}-\u{303F}\uFE0F]/gu, '');
+
+    // 2. Replace Discord custom emojis (e.g., <:emoji_name:emoji_id>) with '0'
+    // This regex looks for the pattern <:[a-zA-Z0-9_]+:[0-9]+>
+    // It also handles animated emojis <a:emoji_name:emoji_id>
+    cleaned = cleaned.replace(/<a?:[a-zA-Z0-9_]+:[0-9]+>/g, '0');
+
+    // 3. Replace Discord markdown links (e.g., [text](url), ![alt](url)) with '0'
+    // This covers both regular markdown links and image markdown links,
+    // including those using http/https or attachment:// schemes.
+    cleaned = cleaned.replace(/!?\[.*?\]\((https?|attachment):\/\/[^\s]+\)/g, '0');
+
+    // 4. Replace Discord spoiler URLs (e.g., ||url||) with '0'
+    // This specifically targets URLs wrapped in spoiler tags.
+    cleaned = cleaned.replace(/\|\|(https?|attachment):\/\/[^\s]+\|\|/g, '0');
+
+    // 5. Replace any remaining generic hyperlinks (http/https/attachment URLs) with '0'
+    // This acts as a catch-all for any URLs not covered by the markdown or spoiler regexes.
+    cleaned = cleaned.replace(/(https?|attachment):\/\/[^\s]+/g, '0');
+
+    // 6. Trim any leading/trailing whitespace that might result from replacements
+    cleaned = cleaned.trim();
+
+    return cleaned;
 };
 
 module.exports = {

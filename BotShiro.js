@@ -91,7 +91,7 @@ client.once('ready', async () => {
 
     // Send Online Announcement
     if (announcementChannel) {
-        // await announcements.sendOnlineAnnouncement(announcementChannel);
+        await announcements.sendOnlineAnnouncement(announcementChannel);
     } else {
         console.warn("Announcement channel unavailable, cannot send online announcement.");
     }
@@ -212,7 +212,7 @@ client.on('messageCreate', async (message) => {
                 commandHandlers.handleBagCommand(message);
                 break;
             case 'bag_dm':
-                // commandHandlers.handleBagDM(client, message);
+                // commandHandlers.handleBagDM(client, message); // just example for DM to user
                 break;
             case 'monster':
                 commandHandlers.handleMonsterCommand(message, currentMonsterStateRef.current); // Pass current state
@@ -248,12 +248,12 @@ client.on('messageCreate', async (message) => {
         gameLogic.handleExpGain(message, userCooldowns, announcementChannel, itemDropChannel, currentMonsterStateRef);
     }
 
+    // Role Logging
     try {
         // Attempt to fetch the member if it's not already cached
         const member = await message.guild.members.fetch(message.author.id);
-        member.roles.cache.forEach((role) => {
-            console.log(`Role Name: ${role.name}, Role ID: ${role.id}`);
-        });
+        // Log the member's roles
+        member.roles.cache.forEach((role) => { console.log(`Role Name: ${role.name}, Role ID: ${role.id}`); });
     } catch (error) {
         console.error(`Could not fetch member ${message.author.id}:`, error);
     }
