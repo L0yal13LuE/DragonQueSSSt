@@ -9,6 +9,8 @@ const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/
 const handleCraftCommand = async (message, args) => {
     try {
 
+        const userId = message.author.id;
+
         const autoClose = 5;
         const autoCloseTimer = (autoClose * 60) * 1000;
         const expirationTimestamp = `<t:${Math.floor((Date.now() + autoClose * 60 * 1000) / 1000)}:R>`;
@@ -48,7 +50,7 @@ const handleCraftCommand = async (message, args) => {
             // const uniqueItemId = `${item.name}`;
             let itemLetter = lettesArray[index];
             let button = new ButtonBuilder()
-                .setCustomId(`craft_${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}`)
+                .setCustomId(`craft_${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}_${userId}`)
                 .setLabel(itemLetter) // Button text
                 .setStyle(ButtonStyle.Primary); // Use a primary button style
 

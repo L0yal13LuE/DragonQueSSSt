@@ -66,23 +66,13 @@ const shopSettings = async (channelId, client) => {
             thumbnail,
             image,
             footer,
-            items
+            items,
+            instance: {},
+            instanceTimeout: {}
         };
 
         let shopSuccess = false;
 
-        // // set discord `client` event listener
-        // client.on(Events.InteractionCreate, async interaction => {
-        //     try {
-        //         await handleShopButtonClick(interaction, shopSettings);
-        //         // console.info("Shop settings available, handling buy interaction.", shopSuccess);
-        //     } catch (error) {
-        //         // console.error("Error handling buy interaction:", error);
-        //     }
-        // });
-
-        // return shop settings object because we need to use it in the main file 
-        // to set the event command listener
         return shopSettings;
     } catch (error) {
         console.error("Error in shopSettings:", error);
