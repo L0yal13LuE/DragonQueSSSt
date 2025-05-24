@@ -55,8 +55,8 @@ const createBagEmbed = (author, itemList) => {
   return createBaseEmbed({
     color: 0x8a2be2, // Purple
     title: `🎒 My Bag 🎒`,
-    footer: { text: `Collect items, you might need them for rewards 😉` },
-    description: `${author.toString()} Let's take a look inside your bag\n\n${itemList}`,
+    footer: { text: `Collect items for rewards! 😉` },
+    description: `${author.toString()} Let's see what's inside!\n\n${itemList}`,
   });
 };
 
@@ -191,6 +191,18 @@ const createItemDropEmbed = (author, item, amount, channelId) => {
   );
 };
 
+const createDamageEmbed = (author, monsterName, damageDealt) => {
+  return createBaseEmbed({
+    color: 0xDC143C, // Crimson red for damage
+    title: "💥 Monster Hit! 💥",
+    description: `${author.toString()} landed a blow on **${monsterName}**!`,
+  }).addFields(
+    { name: "Attacker", value: author.username, inline: true },
+    { name: "Target", value: monsterName, inline: true },
+    { name: "Damage Dealt", value: `**${damageDealt}**`, inline: true }
+  );
+};
+
 module.exports = {
   createRankEmbed,
   createBagEmbed,
@@ -200,5 +212,6 @@ module.exports = {
   createMonsterSpawnEmbed,
   createMonsterDefeatEmbed,
   createItemDropEmbed,
+  createDamageEmbed,
   createBaseEmbed,
 };
