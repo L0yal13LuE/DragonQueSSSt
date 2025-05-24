@@ -130,6 +130,10 @@ const handleShopSelectMenuClick = async (interaction, args) => {
 
         // Parse selected item details
         const itemDetails = parseSelectedItem(interaction.values[0]);
+        if (itemDetails == null) {
+            await handlePurchaseError(interaction, error);
+            return false;
+        }
 
         // Process purchase
         await processPurchase(interaction, itemDetails);
@@ -233,54 +237,62 @@ const processPurchase = async (interaction, itemDetails) => {
 };
 
 const deductCurrency = async (userId, userCurrency, itemDetails) => {
-    const newAmount = userCurrency.amount - itemDetails.price;
-    return await updateUserItem(
-        { id: userId },
-        {
-            id: userCurrency.id,
-            material: userCurrency.material
-        },
-        userCurrency.amount,
-        newAmount
-    );
+    try {
+        const newAmount = userCurrency.amount - itemDetails.price;
+        return await updateUserItem(
+            { id: userId },
+            {
+                id: userCurrency.id,
+                material: userCurrency.material
+            },
+            userCurrency.amount,
+            newAmount
+        );
+    } catch (error) {
+        console.error('deductCurrency: error', error);
+        return false;
+    }
+
 };
 
 const addItemToInventory = async (userId, username, itemDetails) => {
-    const existingItem = await getUserItem({
-        userId: userId,
-        itemId: itemDetails.material_id
-    });
+    try {
+        const existingItem = await getUserItem({
+            userId: userId,
+            itemId: itemDetails.material_id
+        });
 
-    if (existingItem?.length) {
-        const success = await updateUserItem(
-            { id: userId },
-            {
-                id: existingItem[0].id,
-                material: existingItem[0].material
-            },
-            existingItem[0].amount,
-            existingItem[0].amount + itemDetails.material_amount
-        );
-        if (!success) return false;
-        return true;
-    } else {
-        const success = await insertUserItem(
-            { id: userId, username: username },
-            { id: itemDetails.material_id, name: itemDetails.name },
-            itemDetails.material_amount
-        );
-        if (!success) return false;
-        return true;
+        if (existingItem?.length) {
+            const success = await updateUserItem(
+                { id: userId },
+                {
+                    id: existingItem[0].id,
+                    material: existingItem[0].material
+                },
+                existingItem[0].amount,
+                existingItem[0].amount + itemDetails.material_amount
+            );
+            if (!success) return false;
+            return true;
+        } else {
+            const success = await insertUserItem(
+                { id: userId, username: username },
+                { id: itemDetails.material_id, name: itemDetails.name },
+                itemDetails.material_amount
+            );
+            if (!success) return false;
+            return true;
+        }
+    } catch (error) {
+        console.error('addItemToInventory: error', error);
+        return false;
     }
+
 };
 
 const handlePurchaseError = async (interaction, error) => {
-    let errorMessage = 'An unexpected error occurred. Please try again later.';
-    if (interaction.deferred) {
-        await interaction.editReply(errorMessage);
-    } else {
-        await interaction.reply({ content: errorMessage, ephemeral: true });
-    }
+    let errorMessage = 'Your purchase failed. Please try again later.';
+    interaction.channel.send(errorMessage);
 };
 
 // --- Command Export ---

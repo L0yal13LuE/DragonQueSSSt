@@ -238,8 +238,8 @@ client.on('messageCreate', async (message) => {
             //     commandHandlers.handleChatCommand(message, args);
             //     break;
             case 'bag':
-                // commandHandlers.handleBagCommand(message);
-                commandHandlers.handleBagPaginationCommand(message, false);
+                commandHandlers.handleBagCommand(message);
+                // commandHandlers.handleBagPaginationCommand(message, false);
                 break;
             case 'bag_dm':
                 commandHandlers.handleBagPaginationCommand(message, true);
