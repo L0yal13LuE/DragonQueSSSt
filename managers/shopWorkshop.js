@@ -7,7 +7,7 @@ const { handleCraftButtonClick } = require('./craftManager');
 const fs = require('fs');
 const { join } = require('path');
 
-const CACHE_MAT_SELL_DIR = join(__dirname, '../.cache');
+const CACHE_MAT_SELL_DIR = join(__dirname, '../cache');
 
 const shopSettings = async (channelId, client) => {
     try {

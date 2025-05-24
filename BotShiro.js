@@ -275,7 +275,7 @@ client.on('messageCreate', async (message) => {
         // Attempt to fetch the member if it's not already cached
         const member = await message.guild.members.fetch(message.author.id);
         // Log the member's roles
-        member.roles.cache.forEach((role) => { console.log(`Role Name: ${role.name}, Role ID: ${role.id}`); });
+        // member.roles.cache.forEach((role) => { console.log(`Role Name: ${role.name}, Role ID: ${role.id}`); });
     } catch (error) {
         console.error(`Could not fetch member ${message.author.id}:`, error);
     }
