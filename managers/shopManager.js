@@ -6,71 +6,100 @@ const { createBaseEmbed } = require("./embedManager");
 const wait = require('node:timers/promises').setTimeout;
 const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/materialProvider");
 
+const buildRowComponents = async (message, args) => {
+
+    const userItems = await getUserItem({
+        userId: message.author.id
+    });
+
+    // map user item that match sell item
+    args.items = args.items.map((item) => {
+        const found = (userItems && userItems.length > 0) ? userItems.find(userItem => userItem.material.id === item.material_id) : null;
+        return {
+            ...item,
+            owned: found ? found.amount : 0
+        }
+    });
+
+    // console.log("Sell Item", args.items);
+
+    const itemsInSelectMenu = [];
+    args.items.forEach((item, index) => {
+        const amountSuffix = (item.amount > 1) ? `(x${item.amount.toLocaleString()})` : '';
+        const itemValue = `${item.materials.id}-${item.amount}-${item.materials.emoji}-${item.materials.name}/${item.material_use_id}-${item.price}-${item.currency}`;
+        const itemDesc = `${item.price.toLocaleString()} ${item.currency} (Owned: ${item.owned.toLocaleString()})`;
+        itemsInSelectMenu[index] = new StringSelectMenuOptionBuilder()
+            .setLabel(`${item.materials.name} ${amountSuffix}`)
+            .setDescription(itemDesc)
+            .setValue(itemValue)
+            .setEmoji(item.materials.emoji);
+    });
+
+    const rows = [];
+    for (let i = 0; i < itemsInSelectMenu.length; i += 25) {
+        const chunk = itemsInSelectMenu.slice(i, i + 25);
+        const placeholderCount = (itemsInSelectMenu.length <= 25) ? '' : `(Items ${i + 1}-${Math.min(i + 25, itemsInSelectMenu.length)})`;
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId(`shop_base_${Math.floor(1000 + Math.random() * 9000)}`)
+            .setPlaceholder(`Select an item to buy ${placeholderCount}`)
+            .addOptions(chunk)
+            .setMinValues(1)
+            .setMaxValues(1);
+        rows.push(new ActionRowBuilder().addComponents(selectMenu));
+    }
+
+    return rows;
+}
+
 const handleShopCommand = async (message, args) => {
     try {
 
-        const autoClose = 1;
+        const autoClose = 3;
         const autoCloseTimer = (autoClose * 60) * 1000;
+        const expirationTimestamp = `<t:${Math.floor((Date.now() + autoClose * 60 * 1000) / 1000)}:R>`;
 
         // --- 1. Create Embed text ---
         const baseEmbed = createBaseEmbed({
             color: '#0099ff',
             title: args.title,
-            description: `${args.description}\n\n*Shop refresh daily and will automatically close in ${autoClose} minute.*`,
+            description: `${args.description}\n\nShop refresh daily, come again tomorrow to see new items\nExpire in ${autoClose} minute. ${expirationTimestamp}\nPlease make purchase 30 seconds before closing`,
             thumbnail: args.thumbnail,
             footer: { 'text': args.footer },
-        })
-
-        // --- 2. Create Select Menu for each item ---
-        const itemsInSelectMenu = [];
-        args.items.forEach((item, index) => {
-            const amountSuffix = (item.amount > 1) ? `(x${item.amount.toLocaleString()})` : '';
-            const itemValue = `${item.materials.id}-${item.amount}-${item.materials.emoji}-${item.materials.name}/${item.material_use_id}-${item.price}-${item.currency}`;
-            const itemDesc = `${item.price.toLocaleString()} ${item.currency}`;
-            itemsInSelectMenu[index] = new StringSelectMenuOptionBuilder()
-                .setLabel(`${item.materials.name} ${amountSuffix}`)
-                .setDescription(itemDesc)
-                .setValue(itemValue)
-                .setEmoji(item.materials.emoji);
         });
 
-        // --- 3. Create multiple select menus for chunks of 25 items
-        const rows = [];
-        for (let i = 0; i < itemsInSelectMenu.length; i += 25) {
-            const chunk = itemsInSelectMenu.slice(i, i + 25);
-            const placeholderCount = (itemsInSelectMenu.length <= 25) ? '' : `(Items ${i + 1}-${Math.min(i + 25, itemsInSelectMenu.length)})`;
-            const selectMenu = new StringSelectMenuBuilder()
-                .setCustomId(`shop_base_${Math.floor(1000 + Math.random() * 9000)}`)
-                .setPlaceholder(`Select an item to buy ${placeholderCount}`)
-                .addOptions(chunk)
-                .setMinValues(1)
-                .setMaxValues(1);
-            rows.push(new ActionRowBuilder().addComponents(selectMenu));
-        }
+        // --- 2. Create Embed with Items ---
+        // --- 3. Add items as fields to the embed using the new parameters
+        let rows = await buildRowComponents(message, args);
 
         // --- 4. Send the embed with the select menus ---
-        let reply = await message.reply({
+        const reply = await message.reply({
             embeds: [baseEmbed],
             components: rows,
         });
 
         // --- 5. Set up a collector for the select menus ---
-        let collector = reply.createMessageComponentCollector({
+        const collector = reply.createMessageComponentCollector({
             componentType: ComponentType.StringSelect,
-            // time: autoCloseTimer
+            filter: (i) => i.user.id === message.author.id,
+            time: (autoCloseTimer - 30000)
         });
 
         // --- 6. Handle select menu interactions ---
         collector.on('collect', async interaction => {
-            console.log("interaction.values: ", interaction.values);
+            // console.log("interaction.values: ", interaction.values);
             args.message = message;
-            await handleShopSelectMenuClick(interaction, args);
+            const result = await handleShopSelectMenuClick(interaction, args);
+            if (result) {
+                // force refresh the choices after finish purchases
+                rows = await buildRowComponents(message, args);
+                await interaction.message.edit({
+                    components: rows,
+                });
+            }
         });
 
         // --- 7. Delete the message after 1 minute ---
-        let openShopTimer = setTimeout(async () => {
-            collector.stop();
-            clearTimeout(openShopTimer);
+        setTimeout(async () => {
             await reply.delete();
             await message.reply('**Shop session closed.** Thanks for shopping! Use `!shop` to open again.');
         }, autoCloseTimer);
@@ -80,115 +109,52 @@ const handleShopCommand = async (message, args) => {
     }
 
 }
-// Function to handle button interactions for this command
-const handleShopButtonClick = async (interaction, args) => {
-    // Only process button interactions
-    if (!interaction.isButton()) return;
-
-    // Check if the button custom ID starts with 'buy_', indicating a shop purchase attempt
-    if (interaction.customId.startsWith('buy_')) {
-
-        // Defer the reply to prevent interaction timeout, reply is only visible to the user
-        // await interaction.deferReply({ ephemeral: true });
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-        // console.log("interaction.customId: ", interaction.customId);
-        // console.log("interaction.customId.replace('buy_', ''): ", interaction.customId.replace('buy_', ''));
-
-        // // Extract the item name from the custom ID
-        // const itemToBuyName = interaction.customId.replace('buy_', '').replace(/_/g, ' ');
-        // // Find the item details in your shopItems array
-        // const itemToBuy = args.items.find(item => item.name.toLowerCase() === itemToBuyName.toLowerCase());
-
-        const itemToBuyNameA = interaction.customId.replace('buy_', '').replace(/_/g, '');
-        const itemToBuyName = itemToBuyNameA.split('@')[0];
-        const itemToBuy = args.items.find(item => item.letter === itemToBuyName);
-
-        // If the item wasn't found (shouldn't happen if custom IDs are generated correctly, but good practice to check)
-        if (!itemToBuy) {
-            await interaction.editReply('Error: Could not identify the item you wish to purchase.');
-            return;
-        }
-
-        // console.log("itemToBuy: ", itemToBuy);
-
-        // --- Placeholder for your Purchasing Logic ---
-        // This is where you would implement the actual buying process:
-        // 1. Get the user's ID: interaction.user.id
-        // 2. Access your user data (e.g., from a database) to get their current currency.
-        // 3. Compare the user's currency with itemToBuy.price.
-        // 4. If the user has enough gold:
-        //    - Deduct the gold from their balance.
-        //    - Add the item to their inventory.
-        //    - Send a success message using interaction.editReply().
-        // 5. If the user does not have enough gold:
-        //    - Send an insufficient funds message using interaction.editReply().
-        // --- End of Placeholder ---
-
-        // Example of a placeholder response (replace with your actual purchase outcome)
-        const userHasEnoughGold = true; // Assume user has enough gold for this example
-
-        if (userHasEnoughGold) {
-            // await interaction.editReply(`Success: **${itemToBuy.emoji} ${itemToBuy.name}** for ${itemToBuy.price} ${itemToBuy.currency}! (Note: Actual purchase logic is not yet implemented)`);
-            await interaction.editReply(`This feature coming soon! (buying ${itemToBuy.emoji} ${itemToBuy.name} for ${itemToBuy.price} ${itemToBuy.currency})\nStay tuned! for upcoming features!🤗`);
-            // In your real code, you would confirm the successful purchase and update user data.
-        } else {
-            await interaction.editReply(`Fail: You don't have enough gold to purchase the **${itemToBuy.emoji} ${itemToBuy.name}**. You need ${itemToBuy.price} ${itemToBuy.currency}.`);
-            // In your real code, this would be triggered if the user's balance is too low.
-        }
-    }
-}
 
 const handleShopSelectMenuClick = async (interaction, args) => {
+
+    // Validate interaction type
+    if (!interaction.isStringSelectMenu() || !interaction.customId.startsWith('shop_base') || !interaction.values.length) return;
+
+    // IMPORTANT: Check if the interaction has already been deferred or replied to.
+    // This helps prevent errors when the same user interacts from multiple clients simultaneously.
+    if (interaction.deferred || interaction.replied) {
+        console.warn(`Interaction ${interaction.id} from ${interaction.user.tag} was already deferred or replied. Skipping re-processing.`);
+        // Optionally, send an ephemeral follow-up message to the user
+        // if they are trying to interact with an already processed interaction.
+        try {
+            // Only send followUp if it hasn't been replied to or deferred by *this* interaction instance.
+            // This prevents "Interaction has already been acknowledged." errors.
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.followUp({ content: 'This action has already been processed. Please check your inventory or try the shop command again if needed.', ephemeral: true });
+            }
+        } catch (e) {
+            console.error(`Failed to send follow-up for already processed interaction: ${e.message}`);
+        }
+        return; // Exit early if already handled
+    }
+
     try {
-        // Validate user permissions
-        if (!validateUserPermissions(interaction)) return;
-
-        // Validate interaction type
-        if (!interaction.isStringSelectMenu()) return;
-        if (!interaction.customId.startsWith('shop_base') || !interaction.values.length) return;
-
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        // await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferUpdate();
 
         // Parse selected item details
         const itemDetails = parseSelectedItem(interaction.values[0]);
 
         // Process purchase
         await processPurchase(interaction, itemDetails);
+
+        // for testing done
+        // await interaction.channel.send('Purchase successful!');
+
+        return true
     } catch (error) {
         console.error('Shop purchase error:', error);
         await handlePurchaseError(interaction, error);
+        return false;
     }
 };
 
 // Helper Functions
-
-const validateUserPermissions = (interaction) => {
-
-    // Check if interaction is from command author
-    if (interaction.user.id !== interaction.member.user.id) {
-        interaction.reply({
-            content: '⚠️ You can\'t use other people\'s shop, start your shop by typing `!shop`',
-            ephemeral: true
-        });
-        return false;
-    }
-
-    // Check if interaction is within 1 minute time window
-    const interactionTime = Date.now();
-    const commandTime = interaction.message.createdTimestamp;
-    const timeDiff = interactionTime - commandTime;
-
-    if (timeDiff > 60000) { // 1 minutes in milliseconds
-        interaction.reply({
-            content: '⚠️ Shop expired, Please run the command again.',
-            ephemeral: true
-        });
-        return false;
-    }
-
-    return true;
-};
 
 const parseSelectedItem = (selectedValue) => {
     try {
@@ -221,33 +187,38 @@ const processPurchase = async (interaction, itemDetails) => {
     });
 
     if (!userCurrency?.length) {
-        await interaction.editReply(`You don't have any **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!`);
+        // await interaction.editReply(`You don't have any **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!`);
+        await interaction.followUp(`You don't have **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!`);
         return;
     }
 
     const currentBalance = userCurrency[0].amount;
     if (currentBalance < itemDetails.price) {
-        await interaction.editReply(`You don't have enough **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!, You have **${currentBalance.toLocaleString()} ${itemDetails.currency}**`);
+        // await interaction.editReply(`You don't have enough **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!, You have **${currentBalance.toLocaleString()} ${itemDetails.currency}**`);
+        await interaction.followUp(`You don't have enough **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!, You have **${currentBalance.toLocaleString()} ${itemDetails.currency}**`);
         return;
     }
 
     // Process currency deduction
     const success = await deductCurrency(userId, userCurrency[0], itemDetails);
     if (!success) {
-        await interaction.editReply(`Something went wrong while deducting your currency. Please try again later.`);
+        // await interaction.editReply(`Something went wrong while deducting your currency. Please try again later.`);
+        await interaction.followUp(`Something went wrong while deducting your currency. Please try again later.`);
         return;
     }
 
     // Process item addition
     const updateItemResult = await addItemToInventory(userId, username, itemDetails);
     if (!updateItemResult) {
-        await interaction.editReply(`Something went wrong while adding the item to your inventory. Please try again later.`);
+        // await interaction.editReply(`Something went wrong while adding the item to your inventory. Please try again later.`);
+        await interaction.followUp(`Something went wrong while adding the item to your inventory. Please try again later.`);
         return;
     }
 
     // Send success messages
-    const successMessage = `You have successfully bought **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency})`;
-    await interaction.editReply(successMessage);
+    // const successMessage = `You have successfully bought **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency})`;
+    // // await interaction.editReply(successMessage);
+    // await interaction.followUp(successMessage);
     await interaction.channel.send(
         `<@${userId}> bought **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency})`
     );
@@ -307,6 +278,5 @@ const handlePurchaseError = async (interaction, error) => {
 // --- Command Export ---
 module.exports = {
     handleShopCommand,
-    handleShopButtonClick,
     handleShopSelectMenuClick
 };

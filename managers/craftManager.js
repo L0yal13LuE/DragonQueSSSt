@@ -11,6 +11,7 @@ const handleCraftCommand = async (message, args) => {
 
         const autoClose = 5;
         const autoCloseTimer = (autoClose * 60) * 1000;
+        const expirationTimestamp = `<t:${Math.floor((Date.now() + autoClose * 60 * 1000) / 1000)}:R>`;
 
         // --- 1. Create Embed with Items ---
         const baseEmbed = createBaseEmbed({
@@ -32,6 +33,12 @@ const handleCraftCommand = async (message, args) => {
                 inline: false // Set to true to display items side-by-side if they fit (up to 3 per row usually)
             };
             baseEmbed.addFields(mainrow);
+        });
+
+        baseEmbed.addFields({
+            name: ' ',
+            value: `Expire in ${autoClose} minute ${expirationTimestamp}\n\n`,
+            inline: false
         });
 
         // --- 3. Create Buttons for each item ---

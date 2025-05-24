@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { supabase } = require("./supabaseClient");
 const {
   getUser,
@@ -207,44 +207,141 @@ const handleMonsterCommand = async (message, currentMonsterState) => {
   }
 };
 
-const handleBagDM = async (client, message) => {
-  try {
-    // Send a "thinking" message that will be updated
-    // const thinkingMsg = await message.channel.send(`🤔 *${client.user.username} is checking ${message.author.username}'s bag...*`);
 
-    // Simulate thinking time
-    // await new Promise(resolve => setTimeout(resolve, 1000));
+const handleBagPaginationCommand = async (message, isDM = false) => {
+	
+	try {
+		const autoClose = 5;
+        const autoCloseTimer = (autoClose * 60) * 1000;
+        const expirationTimestamp = `<t:${Math.floor((Date.now() + autoClose * 60 * 1000) / 1000)}:R>`;
 
-    // Create an embed for the bag contents
-    const bagEmbed = new EmbedBuilder()
-      .setColor(0x0099FF)
-      .setTitle(`Your Bag`)
-      .setDescription("**🎒 Your Bag Contents:**\n\n• Health Potion x3\n• Gold Coins x250\n• Iron Sword (Durability: 85%)\n• Magic Scroll of Fireball\n• Quest Item: Ancient Relic")
-      .setFooter({ text: 'This is bot message, only you can see this message.' });
+		const ITEMS_PER_PAGE = 10;
+		const userId = message.author.id;
+		const username = message.author.username;
 
-    // Send the bag contents privately via DM
-    const dmMessage = await message.author.send({
-      embeds: [bagEmbed]
-    });
+		const userItems = await getUserItem({
+			userId: userId
+		});
 
-    // Update the original message to indicate the bag was sent privately
-    const thinkingMsg = await message.channel.send(`✅ ${message.author}, I've sent your bag contents to your DMs!`);
-    // await thinkingMsg.edit(`✅ ${message.author}, I've sent your bag contents to your DMs!`);
+		if (isDM) {
+			const itemList = Object.values(userItems).length > 0
+				? Object.values(userItems)
+				.map(
+					(value) =>
+					`${value.material.emoji} ${value.material.name}: ${value.amount}`
+				)
+				.join("\n")
+				: "Your bag is empty... Chat to find some items!";
+
+			const bagEmbed = createBagEmbed(message.author, itemList + `\n\nThis is BOT auto generated message\nPlease do not reply to this message.`);
+
+			try {
+				await message.author.send({embeds: [bagEmbed]});
+				await message.reply(`✅ I've sent your bag contents to your DMs!`);
+			} catch (error) {
+				await message.reply(`❌ Please check setting to allow direct messages from server members.`);
+			}
+			return;
+		}
 
 
-  } catch (error) {
+		// Initialize current page to 0 (first page)
+		let currentPage = 0;
+		const totalPages = Math.ceil(userItems.length / ITEMS_PER_PAGE);
 
-    // Check if the error is because DMs are disabled
-    if (error.code === 50007) { // Cannot send messages to this user
-      message.channel.send(`${message.author}, I couldn't send you a DM 😭\nPlease enable direct messages from server members and try again.`).then(msg => {
-        setTimeout(() => msg.delete().catch(err => console.error(err)), 10000);
-      });
-    } else {
-      message.channel.send('There was an error processing your request.').then(msg => {
-        setTimeout(() => msg.delete().catch(err => console.error(err)), 5000);
-      });
-    }
-  }
+		// Function to create an embed for a specific page
+		const createEmbedItems = (page) => {
+			const start = page * ITEMS_PER_PAGE;
+			const end = start + ITEMS_PER_PAGE;
+			const itemsToShow = userItems.slice(start, end);
+
+			const itemListText = itemsToShow.length > 0
+						? itemsToShow.map((item, index) => `${item.material.emoji} ${item.material.name}: ${item.amount}`).join('\n')
+						: 'Your bag is empty!';
+
+			const embed = new EmbedBuilder()
+				.setColor(0x0099FF) // Blue color for the embed
+				.setTitle(`${username}'s Bag, let's see what's inside!`)
+				.setDescription(`${itemListText}\n\nExpire in ${autoClose} minute ${expirationTimestamp}\n\n`)
+				.setFooter({ text: `Page ${page + 1} of ${totalPages}` });
+
+			return embed;
+		};
+
+		// Create the initial embed and buttons
+		const initialEmbed = createEmbedItems(currentPage);
+
+		// Create action row for pagination buttons
+		const row = new ActionRowBuilder()
+			.addComponents(
+				new ButtonBuilder()
+					.setCustomId(`bag_first_${userId}`)
+					.setLabel('<<')
+					.setStyle(ButtonStyle.Secondary)
+					.setDisabled(currentPage === 0), // Disable if on the first page
+				new ButtonBuilder()
+					.setCustomId(`bag_prev_${userId}`)
+					.setLabel('<')
+					.setStyle(ButtonStyle.Secondary)
+					.setDisabled(currentPage === 0), // Disable if on the first page
+				new ButtonBuilder()
+					.setCustomId(`bag_next_${userId}`)
+					.setLabel('>')
+					.setStyle(ButtonStyle.Secondary)
+					.setDisabled(currentPage >= totalPages - 1), // Disable if on the last page
+				new ButtonBuilder()
+					.setCustomId(`bag_last_${userId}`)
+					.setLabel('>>')
+					.setStyle(ButtonStyle.Secondary)
+					.setDisabled(currentPage >= totalPages - 1), // Disable if on the last page
+			);
+		// Send the initial message with the embed and buttons
+		const replyMessage = await message.reply({
+			embeds: [initialEmbed],
+			components: [row],
+			fetchReply: true // Needed to fetch the message object for the collector
+		});
+
+		// Create a collector to listen for button interactions on this specific message
+		const collector = replyMessage.createMessageComponentCollector({
+			filter: (i) => i.user.id === message.author.id, // Only allow the command invoker to interact
+			time: (autoCloseTimer - 5000) // Collector will expire after 60*5=300 seconds (300000 milliseconds)
+		});
+
+		// Handle button interactions
+		collector.on('collect', async (i) => {
+			if (i.customId === `bag_prev_${userId}`) {
+				currentPage--;
+			} else if (i.customId === `bag_next_${userId}`) {
+				currentPage++;
+			} else if (i.customId === `bag_first_${userId}`) {
+				currentPage=0;
+			} else if (i.customId === `bag_last_${userId}`) {
+				currentPage=totalPages-1;
+			}
+
+			// Update the embed and button states
+			const updatedEmbed = createEmbedItems(currentPage);
+			row.components[0].setDisabled(currentPage === 0); // First button
+			row.components[1].setDisabled(currentPage === 0); // Previous button
+			row.components[2].setDisabled(currentPage >= totalPages - 1); // Next button
+			row.components[3].setDisabled(currentPage >= totalPages - 1); // Last button
+
+			// Update the original message with the new embed and button states
+			await i.update({
+				embeds: [updatedEmbed],
+				components: [row]
+			});
+		});
+
+		// auto delete after 5 minute
+        setTimeout(async () => {
+            await replyMessage.delete();
+            await message.reply('**Bag closed.** Use `!bag` to open again.\n*If you want to keep your items private, use `!bag_dm` instead (please allow dm in your settings)*');
+        }, (autoCloseTimer));
+	} catch (error) {
+		console.error('Error while handling !bag pagination command:', error);
+	}
 };
 
 module.exports = {
@@ -252,5 +349,5 @@ module.exports = {
   handleChatCommand,
   handleBagCommand,
   handleMonsterCommand,
-  handleBagDM
+  handleBagPaginationCommand
 };

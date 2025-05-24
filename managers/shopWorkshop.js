@@ -1,8 +1,6 @@
 const { Events } = require('discord.js');
 const { supabase } = require('../supabaseClient');
 const { getShop, getShopItems } = require('./../dbUtils');
-const { handleShopButtonClick } = require('./shopManager');
-const { handleCraftButtonClick } = require('./craftManager');
 
 const fs = require('fs');
 const { join } = require('path');

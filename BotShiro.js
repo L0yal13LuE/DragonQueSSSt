@@ -7,7 +7,7 @@ require('dotenv').config({
     }[process.env.NODE_ENV || 'development']
 });
 
-const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Events, Partials } = require('discord.js');
 const { supabase } = require('./supabaseClient'); // Import supabase client
 
 // --- Internal Modules ---
@@ -56,6 +56,13 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.DirectMessages, // Optional
     ],
+    partials: [
+        Partials.Message,
+        Partials.Channel,
+        Partials.Reaction,
+        Partials.GuildMember, // Important for fetching members and their roles
+        Partials.User
+    ]
 });
 
 // --- Caches and State ---
@@ -113,7 +120,7 @@ client.once('ready', async () => {
 
     // Send Online Announcement
     if (announcementChannel) {
-        await announcements.sendOnlineAnnouncement(announcementChannel);
+        //await announcements.sendOnlineAnnouncement(announcementChannel);
     } else {
         console.warn("Announcement channel unavailable, cannot send online announcement.");
     }
@@ -138,7 +145,7 @@ client.once('ready', async () => {
     } else {
         console.log(`[Craft] not found: ${craftWorkShopSettings}`);
     }
-    
+
     // Load dynamic configurations like EXP_PER_CHARACTER and COOLDOWN_MILLISECONDS
     if (supabase) {
         console.log("[Config] Loading dynamic configurations from database...");
@@ -217,7 +224,7 @@ client.on('messageCreate', async (message) => {
             // case 'leaderboard': // TODO: still need to be implemented more
             //     handleLeaderboardCommand(message, client);
             //     break;
-            case 'shop':
+            case 'shop_':
                 if (shopWorkShopSettings) {
                     handleShopCommand(message, shopWorkShopSettings);
                 }
@@ -231,10 +238,11 @@ client.on('messageCreate', async (message) => {
             //     commandHandlers.handleChatCommand(message, args);
             //     break;
             case 'bag':
-                commandHandlers.handleBagCommand(message);
+                // commandHandlers.handleBagCommand(message);
+                commandHandlers.handleBagPaginationCommand(message, false);
                 break;
             case 'bag_dm':
-                // commandHandlers.handleBagDM(client, message); // just example for DM to user
+                commandHandlers.handleBagPaginationCommand(message, true);
                 break;
             case 'monster':
                 commandHandlers.handleMonsterCommand(message, currentMonsterStateRef.current); // Pass current state
@@ -272,10 +280,16 @@ client.on('messageCreate', async (message) => {
 
     // Role Logging
     try {
-        // Attempt to fetch the member if it's not already cached
-        const member = await message.guild.members.fetch(message.author.id);
-        // Log the member's roles
-        // member.roles.cache.forEach((role) => { console.log(`Role Name: ${role.name}, Role ID: ${role.id}`); });
+        if (message?.guild?.members) {
+            // Attempt to fetch the member if it's not already cached
+            // const member = await message.guild.members.fetch(message.author.id);
+            // Log the member's roles
+            // member.roles.cache.forEach((role) => { console.log(`Role Name: ${role.name}, Role ID: ${role.id}`); });
+        } else {
+            // Handle when someone DMs the bot outside guild discord.
+            message.reply("I'm a RPG bot live in **Dragon QueSSSt** discord. Please join the server to play with me!");
+            return;
+        }
     } catch (error) {
         console.error(`Could not fetch member ${message.author.id}:`, error);
     }
@@ -283,33 +297,33 @@ client.on('messageCreate', async (message) => {
 
 // set discord `client` event listener
 client.on(Events.InteractionCreate, async (interaction) => {
-  try {
-    console.error("Events.InteractionCreate : start!", interaction.customId);
-    //if (
-    //  interaction.isButton() &&
-    //  interaction.customId.startsWith("buy_") &&
-    //  shopWorkShopSettings
-    //) {
-    //  console.log("[Shop] Click Button : ", interaction.customId);
-    //  await handleShopButtonClick(interaction, shopWorkShopSettings);
-    //  return;
-    //}
-    if (
-      interaction.isButton() &&
-      interaction.customId.startsWith("craft_") &&
-      craftWorkShopSettings
-    ) {
-      console.log("[Craft] Click Button : ", interaction.customId);
-      await handleCraftButtonClick(interaction, craftWorkShopSettings);
-      return;
+    try {
+        console.error("Events.InteractionCreate : start!", interaction.customId);
+        //if (
+        //  interaction.isButton() &&
+        //  interaction.customId.startsWith("buy_") &&
+        //  shopWorkShopSettings
+        //) {
+        //  console.log("[Shop] Click Button : ", interaction.customId);
+        //  await handleShopButtonClick(interaction, shopWorkShopSettings);
+        //  return;
+        //}
+        if (
+            interaction.isButton() &&
+            interaction.customId.startsWith("craft_") &&
+            craftWorkShopSettings
+        ) {
+            console.log("[Craft] Click Button : ", interaction.customId);
+            await handleCraftButtonClick(interaction, craftWorkShopSettings);
+            return;
+        }
+        if (interaction.commandName === "send") {
+            await handleSendCommand(interaction);
+            return;
+        }
+    } catch (error) {
+        console.error("Events.InteractionCreate : Failed!", error);
     }
-    if (interaction.commandName === "send") {
-      await handleSendCommand(interaction);
-      return;
-    }
-  } catch (error) {
-    console.error("Events.InteractionCreate : Failed!", error);
-  }
 });
 
 // --- Login to Discord ---
