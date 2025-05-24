@@ -35,7 +35,7 @@ const ANNOUNCEMENT_CHANNEL_ID = process.env.ANNOUNCEMENT_CHANNEL_ID; // For leve
 const ITEM_DROP_CHANNEL_ID = process.env.ITEM_DROP_CHANNEL_ID; // For item-drop- ONLY
 const DAMAGE_LOG = process.env.DAMAGE_LOG; // For item-drop- ONLY
 
-const CHANNEL_ID_1 = ANNOUNCEMENT_CHANNEL_ID; 
+const CHANNEL_ID_1 = ANNOUNCEMENT_CHANNEL_ID;
 
 // --- Configuration Validation ---
 if (!TOKEN) {
@@ -226,7 +226,7 @@ client.on('messageCreate', async (message) => {
             //     break;
             case 'shop':
                 if (shopWorkShopSettings) {
-                    handleShopCommand(message, shopWorkShopSettings);
+                    shopWorkShopSettings = await handleShopCommand(message, shopWorkShopSettings);
                 }
                 break;
             case 'craft':
@@ -299,15 +299,15 @@ client.on('messageCreate', async (message) => {
 client.on(Events.InteractionCreate, async (interaction) => {
     try {
         console.error("Events.InteractionCreate : start!", interaction.customId);
-        //if (
-        //  interaction.isButton() &&
-        //  interaction.customId.startsWith("buy_") &&
-        //  shopWorkShopSettings
-        //) {
-        //  console.log("[Shop] Click Button : ", interaction.customId);
-        //  await handleShopButtonClick(interaction, shopWorkShopSettings);
-        //  return;
-        //}
+        if (
+            interaction.isStringSelectMenu() &&
+            interaction.customId.startsWith("shop_base") &&
+            shopWorkShopSettings
+        ) {
+            console.log("[Shop] Click Button : ", interaction.customId);
+            await handleShopSelectMenuClick(interaction, shopWorkShopSettings);
+            return;
+        }
         if (
             interaction.isButton() &&
             interaction.customId.startsWith("craft_") &&

@@ -6,20 +6,24 @@ const { createBaseEmbed } = require("./embedManager");
 const wait = require('node:timers/promises').setTimeout;
 const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/materialProvider");
 
-const buildRowComponents = async (message, args) => {
 
-    const userItems = await getUserItem({
-        userId: message.author.id
-    });
+const buildRowComponents = async (message, args, refreshItem) => {
 
-    // map user item that match sell item
-    args.items = args.items.map((item) => {
-        const found = (userItems && userItems.length > 0) ? userItems.find(userItem => userItem.material.id === item.material_id) : null;
-        return {
-            ...item,
-            owned: found ? found.amount : 0
-        }
-    });
+    if (refreshItem) {
+        // const userItems = await getUserItem({
+        //     userId: message.author.id
+        // });
+
+        // // map user item that match sell item
+        // args.items = args.items.map((item) => {
+        //     const found = (userItems && userItems.length > 0) ? userItems.find(userItem => userItem.material.id === item.material_id) : null;
+        //     return {
+        //         ...item,
+        //         owned: found ? found.amount : 0
+        //     }
+        // });
+    }
+
 
     // console.log("Sell Item", args.items);
 
@@ -27,7 +31,8 @@ const buildRowComponents = async (message, args) => {
     args.items.forEach((item, index) => {
         const amountSuffix = (item.amount > 1) ? `(x${item.amount.toLocaleString()})` : '';
         const itemValue = `${item.materials.id}-${item.amount}-${item.materials.emoji}-${item.materials.name}/${item.material_use_id}-${item.price}-${item.currency}`;
-        const itemDesc = `${item.price.toLocaleString()} ${item.currency} (Owned: ${item.owned.toLocaleString()})`;
+        //const itemDesc = `${item.price.toLocaleString()} ${item.currency} (Owned: ${item.owned.toLocaleString()})`;
+        const itemDesc = `${item.price.toLocaleString()} ${item.currency}`;
         itemsInSelectMenu[index] = new StringSelectMenuOptionBuilder()
             .setLabel(`${item.materials.name} ${amountSuffix}`)
             .setDescription(itemDesc)
@@ -35,10 +40,16 @@ const buildRowComponents = async (message, args) => {
             .setEmoji(item.materials.emoji);
     });
 
-    const rows = [];
-    for (let i = 0; i < itemsInSelectMenu.length; i += 25) {
-        const chunk = itemsInSelectMenu.slice(i, i + 25);
-        const placeholderCount = (itemsInSelectMenu.length <= 25) ? '' : `(Items ${i + 1}-${Math.min(i + 25, itemsInSelectMenu.length)})`;
+    // const clearAmouunt = new StringSelectMenuOptionBuilder()
+    //     .setLabel(`Clear`)
+    //     .setDescription('Select to clear your choice')
+    //     .setValue('clear')
+    //     .setEmoji('❌');
+
+    const rows = [], maxChunkSize = 24;
+    for (let i = 0; i < itemsInSelectMenu.length; i += maxChunkSize) {
+        const chunk = itemsInSelectMenu.slice(i, i + maxChunkSize); //.concat([clearAmouunt]);
+        const placeholderCount = (itemsInSelectMenu.length <= maxChunkSize) ? '' : `(Items ${i + 1}-${Math.min(i + maxChunkSize, itemsInSelectMenu.length)})`;
         const selectMenu = new StringSelectMenuBuilder()
             .setCustomId(`shop_base_${Math.floor(1000 + Math.random() * 9000)}`)
             .setPlaceholder(`Select an item to buy ${placeholderCount}`)
@@ -54,7 +65,9 @@ const buildRowComponents = async (message, args) => {
 const handleShopCommand = async (message, args) => {
     try {
 
-        const autoClose = 3;
+        const userId = message.author.id;
+
+        const autoClose = 2;
         const autoCloseTimer = (autoClose * 60) * 1000;
         const expirationTimestamp = `<t:${Math.floor((Date.now() + autoClose * 60 * 1000) / 1000)}:R>`;
 
@@ -62,14 +75,14 @@ const handleShopCommand = async (message, args) => {
         const baseEmbed = createBaseEmbed({
             color: '#0099ff',
             title: args.title,
-            description: `${args.description}\n\nShop refresh daily, come again tomorrow to see new items\nExpire in ${autoClose} minute. ${expirationTimestamp}\nPlease make purchase 30 seconds before closing`,
+            description: `${args.description}\nYou can retry if purchase failed.\nExpire in ${autoClose} minute. ${expirationTimestamp}\nplease make purchase 30 seconds before closing`,
             thumbnail: args.thumbnail,
             footer: { 'text': args.footer },
         });
 
         // --- 2. Create Embed with Items ---
         // --- 3. Add items as fields to the embed using the new parameters
-        let rows = await buildRowComponents(message, args);
+        const rows = await buildRowComponents(message, args, true);
 
         // --- 4. Send the embed with the select menus ---
         let reply = await message.reply({
@@ -77,36 +90,19 @@ const handleShopCommand = async (message, args) => {
             components: rows,
         });
 
-        // --- 5. Set up a collector for the select menus ---
-        let collector = reply.createMessageComponentCollector({
-            componentType: ComponentType.StringSelect,
-            filter: (i) => i.user.id === message.author.id,
-            time: (autoCloseTimer - 30000)
-        });
-
-        // --- 6. Handle select menu interactions ---
-        collector.on('collect', async interaction => {
-            // console.log("interaction.values: ", interaction.values);
-            args.message = message;
-            let result = await handleShopSelectMenuClick(interaction, args);
-            if (result) {
-                // force refresh the choices after finish purchases
-                rows = await buildRowComponents(message, args);
-                await interaction.message.edit({
-                    components: rows,
-                });
-            }
-        });
-
-        // --- 7. Delete the message after 1 minute ---
-        setTimeout(async () => {
+        // --- 5. Delete the message after 1 minute ---
+        let instanceTimeout = setTimeout(async () => {
             try {
+                if (instanceTimeout) clearTimeout(instanceTimeout);
                 await reply.delete();
+                await message.reply('**Shop session closed.** Thanks for shopping! Use `!shop` to open again.');
             } catch (errorDel) {
                 console.error('Error deleting message:', errorDel);
             }
-            await message.reply('**Shop session closed.** Thanks for shopping! Use `!shop` to open again.');
         }, autoCloseTimer);
+        args.instance[userId] = reply
+        args.instanceTimeout[userId] = instanceTimeout;
+        return args;
     } catch (error) {
         console.error('Error sending shop embed with buttons:', error);
         message.reply('Could not display the shop at this time.');
@@ -117,29 +113,20 @@ const handleShopCommand = async (message, args) => {
 const handleShopSelectMenuClick = async (interaction, args) => {
 
     // Validate interaction type
-    if (!interaction.isStringSelectMenu() || !interaction.customId.startsWith('shop_base') || !interaction.values.length) return;
-
-    // IMPORTANT: Check if the interaction has already been deferred or replied to.
-    // This helps prevent errors when the same user interacts from multiple clients simultaneously.
-    if (interaction.deferred || interaction.replied) {
-        console.warn(`Interaction ${interaction.id} from ${interaction.user.tag} was already deferred or replied. Skipping re-processing.`);
-        // Optionally, send an ephemeral follow-up message to the user
-        // if they are trying to interact with an already processed interaction.
-        try {
-            // Only send followUp if it hasn't been replied to or deferred by *this* interaction instance.
-            // This prevents "Interaction has already been acknowledged." errors.
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.followUp({ content: 'This action has already been processed. Please check your inventory or try the shop command again if needed.', ephemeral: true });
-            }
-        } catch (e) {
-            console.error(`Failed to send follow-up for already processed interaction: ${e.message}`);
-        }
-        return; // Exit early if already handled
+    if (!interaction.isStringSelectMenu() || !interaction.customId.startsWith('shop_base') || !interaction.values.length) {
+        console.error('Validate interaction type')
+        return;
     }
 
     try {
-        // await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        await interaction.deferUpdate();
+
+        const userId = interaction.user.id;
+
+        if (interaction.deferred || interaction.replied) {
+            await interaction.deferUpdate({ flags: MessageFlags.Ephemeral });
+        } else {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        }
 
         // Parse selected item details
         const itemDetails = parseSelectedItem(interaction.values[0]);
@@ -150,6 +137,22 @@ const handleShopSelectMenuClick = async (interaction, args) => {
         // for testing done
         // await interaction.channel.send('Purchase successful!');
 
+        try {
+            if (args.instance && args.instance[userId]) {
+                await args.instance[userId].delete();
+                args.instance[userId] = null;
+            } else {
+                console.log('args.instance : not found', args);
+            }
+            if (args.instanceTimeout && args.instanceTimeout[userId]) {
+                clearTimeout(args.instanceTimeout[userId]);
+                args.instanceTimeout[userId] = null;
+            } else {
+                console.log('args.instanceTimeout : not found', args);
+            }
+        } catch (errorDel) {
+            console.error('Error deleting message:', errorDel);
+        }
         return true
     } catch (error) {
         console.error('Shop purchase error:', error);
@@ -191,41 +194,42 @@ const processPurchase = async (interaction, itemDetails) => {
     });
 
     if (!userCurrency?.length) {
-        // await interaction.editReply(`You don't have any **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!`);
-        await interaction.followUp(`You don't have **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!`);
+        await interaction.editReply(`You don't have any **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!`);
+        // await interaction.followUp(`You don't have **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!`);
         return;
     }
 
     const currentBalance = userCurrency[0].amount;
     if (currentBalance < itemDetails.price) {
-        // await interaction.editReply(`You don't have enough **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!, You have **${currentBalance.toLocaleString()} ${itemDetails.currency}**`);
-        await interaction.followUp(`You don't have enough **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!, You have **${currentBalance.toLocaleString()} ${itemDetails.currency}**`);
+        await interaction.editReply(`You don't have enough **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!, You have **${currentBalance.toLocaleString()} ${itemDetails.currency}**`);
+        // await interaction.followUp(`You don't have enough **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!, You have **${currentBalance.toLocaleString()} ${itemDetails.currency}**`);
         return;
     }
 
     // Process currency deduction
     const success = await deductCurrency(userId, userCurrency[0], itemDetails);
     if (!success) {
-        // await interaction.editReply(`Something went wrong while deducting your currency. Please try again later.`);
-        await interaction.followUp(`Something went wrong while deducting your currency. Please try again later.`);
+        await interaction.editReply(`Something went wrong while deducting your currency. Please try again later.`);
+        // await interaction.followUp(`Something went wrong while deducting your currency. Please try again later.`);
         return;
     }
 
     // Process item addition
     const updateItemResult = await addItemToInventory(userId, username, itemDetails);
     if (!updateItemResult) {
-        // await interaction.editReply(`Something went wrong while adding the item to your inventory. Please try again later.`);
-        await interaction.followUp(`Something went wrong while adding the item to your inventory. Please try again later.`);
+        await interaction.editReply(`Something went wrong while adding the item to your inventory. Please try again later.`);
+        // await interaction.followUp(`Something went wrong while adding the item to your inventory. Please try again later.`);
         return;
     }
 
     // Send success messages
-    // const successMessage = `You have successfully bought **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency})`;
-    // // await interaction.editReply(successMessage);
+    const successMessage = `Buying **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency}), Please wait...`;
+    await interaction.editReply(successMessage);
     // await interaction.followUp(successMessage);
     await interaction.channel.send(
         `<@${userId}> bought **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency})`
     );
+    return;
 };
 
 const deductCurrency = async (userId, userCurrency, itemDetails) => {
