@@ -28,6 +28,7 @@ const { handleShopCommand, handleShopSelectMenuClick } = require('./managers/sho
 const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
 const { handleSendCommand } = require('./slashCommandHandler.js');
+const { handleBagCommand, handleBagPaginationInteraction} = require('./managers/bagPaginationManager.js');
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -231,18 +232,22 @@ client.on('messageCreate', async (message) => {
                 break;
             case 'craft':
                 if (craftWorkShopSettings) {
-                    handleCraftCommand(message, craftWorkShopSettings);
+                    await handleCraftCommand(message, craftWorkShopSettings);
                 }
                 break;
             // case 'chat': // useless ?
             //     commandHandlers.handleChatCommand(message, args);
             //     break;
             case 'bag':
-                commandHandlers.handleBagCommand(message);
-                // commandHandlers.handleBagPaginationCommand(message, false);
+                await commandHandlers.handleBagCommand(message);
                 break;
+            case 'newbag':
+            case 'bagnew':
+                await handleBagCommand(message, false);
+                break;
+            case 'bagdm':
             case 'bag_dm':
-                commandHandlers.handleBagPaginationCommand(message, true);
+                await commandHandlers.handleBagPaginationCommand(message, true);
                 break;
             case 'monster':
                 commandHandlers.handleMonsterCommand(message, currentMonsterStateRef.current); // Pass current state
@@ -275,7 +280,7 @@ client.on('messageCreate', async (message) => {
         // --- END BOT MENTION CHECK ---
 
         // Pass necessary dependencies and the state reference object
-        gameLogic.handleExpGain(message, userCooldowns, announcementChannel, itemDropChannel, damageLogChannel, currentMonsterStateRef);
+        await gameLogic.handleExpGain(message, userCooldowns, announcementChannel, itemDropChannel, damageLogChannel, currentMonsterStateRef);
     }
 
     // Role Logging
@@ -299,12 +304,7 @@ client.on('messageCreate', async (message) => {
 client.on(Events.InteractionCreate, async (interaction) => {
     try {
         console.error("Events.InteractionCreate : start!", interaction.customId);
-        if (
-            interaction.isStringSelectMenu() &&
-            interaction.customId.startsWith("shop_base") &&
-            shopWorkShopSettings
-        ) {
-            console.log("[Shop] Click Button : ", interaction.customId);
+        if (interaction.customId.startsWith("shop_base") && shopWorkShopSettings) {
             await handleShopSelectMenuClick(interaction, shopWorkShopSettings);
             return;
         }
@@ -319,6 +319,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         if (interaction.commandName === "send") {
             await handleSendCommand(interaction);
+            return;
+        }
+        if (interaction.isButton() && interaction.customId.startsWith('bag_nav_')) { // bag navigation button interaction received
+            await handleBagPaginationInteraction(interaction);
             return;
         }
     } catch (error) {

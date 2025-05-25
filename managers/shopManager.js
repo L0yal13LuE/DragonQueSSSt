@@ -71,11 +71,32 @@ const handleShopCommand = async (message, args) => {
         const autoCloseTimer = (autoClose * 60) * 1000;
         const expirationTimestamp = `<t:${Math.floor((Date.now() + autoClose * 60 * 1000) / 1000)}:R>`;
 
+        // Ensure args.instance and args.instanceTimeout are Maps
+        if (!(args.instance instanceof Map)) {
+            args.instance = new Map(); // Stores Message objects, keyed by userId
+        }
+        if (!(args.instanceTimeout instanceof Map)) {
+            args.instanceTimeout = new Map(); // Stores Timeout IDs, keyed by userId
+        }
+
+        // Clear any existing shop for this user before creating a new one
+        if (args.instance.has(userId)) {
+            const oldMessage = args.instance.get(userId);
+            try {
+                await oldMessage.delete();
+            } catch (e) { /* ignore if already deleted */ }
+            args.instance.delete(userId);
+        }
+        if (args.instanceTimeout.has(userId)) {
+            clearTimeout(args.instanceTimeout.get(userId));
+            args.instanceTimeout.delete(userId);
+        }
+
         // --- 1. Create Embed text ---
         const baseEmbed = createBaseEmbed({
             color: '#0099ff',
             title: args.title,
-            description: `${args.description}\nYou can retry if purchase failed.\nExpire in ${autoClose} minute. ${expirationTimestamp}\nplease make purchase 30 seconds before closing`,
+            description: `${args.description}\n\nYou can retry if purchase failed.\nExpire in ${autoClose} minute. ${expirationTimestamp}\n*please make purchase 30 seconds before closing*`,
             thumbnail: args.thumbnail,
             footer: { 'text': args.footer },
         });
@@ -90,18 +111,23 @@ const handleShopCommand = async (message, args) => {
             components: rows,
         });
 
+
         // --- 5. Delete the message after 1 minute ---
         let instanceTimeout = setTimeout(async () => {
             try {
                 if (instanceTimeout) clearTimeout(instanceTimeout);
                 await reply.delete();
-                await message.reply('**Shop session closed.** Thanks for shopping! Use `!shop` to open again.');
+                await message.reply('**Shop session closed.** Use `!shop` to open again.');
             } catch (errorDel) {
                 console.error('Error deleting message:', errorDel);
             }
         }, autoCloseTimer);
-        args.instance[userId] = reply
-        args.instanceTimeout[userId] = instanceTimeout;
+
+        args.instance.set(userId, reply);
+        args.instanceTimeout.set(userId, instanceTimeout);
+
+        // args.instance[userId] = reply
+        // args.instanceTimeout[userId] = instanceTimeout;
         return args;
     } catch (error) {
         console.error('Error sending shop embed with buttons:', error);
@@ -122,10 +148,17 @@ const handleShopSelectMenuClick = async (interaction, args) => {
 
         const userId = interaction.user.id;
 
-        if (interaction.deferred || interaction.replied) {
-            await interaction.deferUpdate({ flags: MessageFlags.Ephemeral });
-        } else {
+        // Defer reply ephemerally
+        if (!interaction.deferred && !interaction.replied) {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        } else if (interaction.replied && !interaction.ephemeral) {
+            // If it was replied but not ephemerally (should not happen with collector setup)
+            // We can't change it to ephemeral here. This is a tricky state.
+            // For now, assume deferReply or an ephemeral update.
+            await interaction.deferUpdate().catch(console.error); // Acknowledge
+        } else if (interaction.deferred && !interaction.ephemeral) {
+            // Already deferred but not ephemerally, update to acknowledge
+            await interaction.deferUpdate().catch(console.error);
         }
 
         // Parse selected item details
@@ -141,23 +174,33 @@ const handleShopSelectMenuClick = async (interaction, args) => {
         // for testing done
         // await interaction.channel.send('Purchase successful!');
 
-        try {
-            if (args.instance && args.instance[userId]) {
-                await args.instance[userId].delete();
-                args.instance[userId] = null;
-            } else {
-                console.log('args.instance : not found', args);
+        // if (args.instance && args.instance[userId]) {
+        //     await args.instance[userId].delete();
+        //     args.instance[userId] = null;
+        // } else {
+        //     console.log('args.instance : not found', args);
+        // }
+        // if (args.instanceTimeout && args.instanceTimeout[userId]) {
+        //     clearTimeout(args.instanceTimeout[userId]);
+        //     args.instanceTimeout[userId] = null;
+        // } else {
+        //     console.log('args.instanceTimeout : not found', args);
+        // }
+
+        const shopMessage = args.instance.get(userId);
+        if (shopMessage) {
+            try {
+                await shopMessage.delete();
+            } catch (errorDel) {
+                if (errorDel.code !== 10008) console.error('Error deleting main shop message after purchase:', errorDel);
             }
-            if (args.instanceTimeout && args.instanceTimeout[userId]) {
-                clearTimeout(args.instanceTimeout[userId]);
-                args.instanceTimeout[userId] = null;
-            } else {
-                console.log('args.instanceTimeout : not found', args);
-            }
-        } catch (errorDel) {
-            console.error('Error deleting message:', errorDel);
+            args.instance.delete(userId); // Remove from Map
         }
-        return true
+        if (args.instanceTimeout.has(userId)) {
+            clearTimeout(args.instanceTimeout.get(userId));
+            args.instanceTimeout.delete(userId); // Remove from Map
+        }
+        return true; // Indicate successful handling, collector will stop
     } catch (error) {
         console.error('Shop purchase error:', error);
         await handlePurchaseError(interaction, error);
@@ -192,7 +235,7 @@ const processPurchase = async (interaction, itemDetails) => {
     const username = interaction.member.user.username;
 
     // Check user's currency balance
-    const userCurrency = await getUserItem({
+    /*const userCurrency = await getUserItem({
         userId: userId,
         itemId: itemDetails.material_use_id
     });
@@ -224,7 +267,7 @@ const processPurchase = async (interaction, itemDetails) => {
         await interaction.editReply(`Something went wrong while adding the item to your inventory. Please try again later.`);
         // await interaction.followUp(`Something went wrong while adding the item to your inventory. Please try again later.`);
         return;
-    }
+    }*/
 
     // Send success messages
     const successMessage = `Buying **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency}), Please wait...`;
@@ -291,8 +334,11 @@ const addItemToInventory = async (userId, username, itemDetails) => {
 };
 
 const handlePurchaseError = async (interaction, error) => {
-    let errorMessage = 'Your purchase failed. Please try again later.';
-    interaction.channel.send(errorMessage);
+    try {
+        interaction.channel.send('Your purchase failed. Please try again later.');
+    } catch (error) {
+        console.error('handlePurchaseError: error', error);
+    }
 };
 
 // --- Command Export ---

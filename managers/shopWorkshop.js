@@ -67,8 +67,8 @@ const shopSettings = async (channelId, client) => {
             image,
             footer,
             items,
-            instance: {},
-            instanceTimeout: {}
+            instance: new Map(),
+            instanceTimeout: new Map()
         };
 
         let shopSuccess = false;
