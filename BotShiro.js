@@ -27,7 +27,8 @@ const { shopSettings, craftSettings } = require('./managers/shopWorkshop.js');
 const { handleShopCommand, handleShopSelectMenuClick } = require('./managers/shopManager.js');
 const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
-const { handleSendCommand } = require('./slashCommandHandler.js');
+// const { handleSendCommand } = require('./slashCommandHandler.js');
+const { handleSendCommand } = require('./slashCommandHandlerV2.js');
 const { handleBagCommand, handleBagPaginationInteraction} = require('./managers/bagPaginationManager.js');
 
 // --- Configuration ---
@@ -121,7 +122,7 @@ client.once('ready', async () => {
 
     // Send Online Announcement
     if (announcementChannel) {
-        await announcements.sendOnlineAnnouncement(announcementChannel);
+        //await announcements.sendOnlineAnnouncement(announcementChannel);
     } else {
         console.warn("Announcement channel unavailable, cannot send online announcement.");
     }
@@ -199,10 +200,12 @@ client.once('ready', async () => {
 
     // Setup Hourly Monster Check
     if (supabase && announcementChannel) {
+        try {
         console.log("Setting up hourly monster check...");
         await gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef); // Initial check on startup
         setInterval(() => gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef), CONSTANTS.HOURLY_CHECK_INTERVAL);
         console.log(`Hourly monster check scheduled every ${CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)} minutes.`);
+        } catch (error) { console.error("Error setting up hourly monster check:", error); }
     } else {
         console.warn("Hourly monster check cannot be started: Supabase or Announcement Channel unavailable.");
     }
@@ -303,8 +306,8 @@ client.on('messageCreate', async (message) => {
 // set discord `client` event listener
 client.on(Events.InteractionCreate, async (interaction) => {
     try {
-        console.error("Events.InteractionCreate : start!", interaction.customId);
-        if (interaction.customId.startsWith("shop_base") && shopWorkShopSettings) {
+        if (interaction.customId) console.error("Events.InteractionCreate : start!", interaction.customId);
+        if (interaction.isStringSelectMenu() && interaction.customId.startsWith("shop_base") && shopWorkShopSettings) {
             await handleShopSelectMenuClick(interaction, shopWorkShopSettings);
             return;
         }

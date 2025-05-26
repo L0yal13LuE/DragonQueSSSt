@@ -235,7 +235,7 @@ const processPurchase = async (interaction, itemDetails) => {
     const username = interaction.member.user.username;
 
     // Check user's currency balance
-    /*const userCurrency = await getUserItem({
+    const userCurrency = await getUserItem({
         userId: userId,
         itemId: itemDetails.material_use_id
     });
@@ -267,7 +267,7 @@ const processPurchase = async (interaction, itemDetails) => {
         await interaction.editReply(`Something went wrong while adding the item to your inventory. Please try again later.`);
         // await interaction.followUp(`Something went wrong while adding the item to your inventory. Please try again later.`);
         return;
-    }*/
+    }
 
     // Send success messages
     const successMessage = `Buying **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency}), Please wait...`;
