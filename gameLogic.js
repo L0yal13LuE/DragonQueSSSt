@@ -156,6 +156,8 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
     // Clean up discord message prevent using emoji or http images spamming
     message.content = cleanDiscordMessage(message.content);
 
+    console.log(`[${username}]--->${message.content}<---`);
+
     const allowedChannelData = await getChannel({isGainExp: true});
     const isChannelAllowed = allowedChannelData && allowedChannelData.some(channel => channel.id === message.channel.id);
 
@@ -348,7 +350,7 @@ const hourlyMonsterCheck = async (client, announcementChannel, currentMonsterSta
    * @returns {string} The cleaned message content.
    */
 const cleanDiscordMessage = (messageContent) => {
-    let cleaned = messageContent;
+    /*let cleaned = messageContent;
 
     // 1. Remove standard Unicode emojis
     // This regex matches most common Unicode emojis.
@@ -376,7 +378,26 @@ const cleanDiscordMessage = (messageContent) => {
     // 6. Trim any leading/trailing whitespace that might result from replacements
     cleaned = cleaned.trim();
 
-    return cleaned;
+    if (messageContent && messageContent != "" && cleaned == "") {
+        cleaned = "0";
+    }
+
+    return cleaned;*/
+
+    // Regex to replace anything inside <>, anything after :, and http/https links
+    // [1] Replace content within <...>
+    // [2] Replace content after : (e.g., :emoji:)
+    // [3] Replace http and https links
+    let cleanedText = messageContent.replace(/<[^>]+>/g, '0'); // [1]
+    cleanedText = cleanedText.replace(/:\S+/g, '0');    // [2] (Matches a colon followed by one or more non-whitespace characters)
+    cleanedText = cleanedText.replace(/https?:\/\/\S+/g, '0'); // [3]
+
+    if (messageContent != "" && cleanedText == "") {
+        // user actually typing something but our script went wrong so return 1 character.
+        cleanedText = "0";
+    }
+
+    return cleanedText.trim();
 };
 
 module.exports = {
