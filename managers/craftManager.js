@@ -80,7 +80,7 @@ const handleCraftCommand = async (message, args) => {
             } catch (errorDel) {
                 console.error('Error deleting message:', errorDel);
             }
-            await message.reply('**Crafting session closed.** Use `!craft` to start again!');
+            await message.reply('**Crafting session closed.** Use `!craft` to open again.');
         }, autoCloseTimer);
     } catch (error) {
         console.error('Error sending shop embed with buttons:', error);

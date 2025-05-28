@@ -27,7 +27,9 @@ const { shopSettings, craftSettings } = require('./managers/shopWorkshop.js');
 const { handleShopCommand, handleShopSelectMenuClick } = require('./managers/shopManager.js');
 const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
+// const { handleSendCommand } = require('./slashCommandHandler.js');
 const { handleSendCommand } = require('./slashCommandHandler.js');
+const { handleBagCommand, handleBagPaginationInteraction} = require('./managers/bagPaginationManager.js');
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -120,7 +122,7 @@ client.once('ready', async () => {
 
     // Send Online Announcement
     if (announcementChannel) {
-        await announcements.sendOnlineAnnouncement(announcementChannel);
+        //await announcements.sendOnlineAnnouncement(announcementChannel);
     } else {
         console.warn("Announcement channel unavailable, cannot send online announcement.");
     }
@@ -198,10 +200,12 @@ client.once('ready', async () => {
 
     // Setup Hourly Monster Check
     if (supabase && announcementChannel) {
+        try {
         console.log("Setting up hourly monster check...");
         await gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef); // Initial check on startup
         setInterval(() => gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef), CONSTANTS.HOURLY_CHECK_INTERVAL);
         console.log(`Hourly monster check scheduled every ${CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)} minutes.`);
+        } catch (error) { console.error("Error setting up hourly monster check:", error); }
     } else {
         console.warn("Hourly monster check cannot be started: Supabase or Announcement Channel unavailable.");
     }
@@ -231,18 +235,22 @@ client.on('messageCreate', async (message) => {
                 break;
             case 'craft':
                 if (craftWorkShopSettings) {
-                    handleCraftCommand(message, craftWorkShopSettings);
+                    await handleCraftCommand(message, craftWorkShopSettings);
                 }
                 break;
             // case 'chat': // useless ?
             //     commandHandlers.handleChatCommand(message, args);
             //     break;
             case 'bag':
-                commandHandlers.handleBagCommand(message);
-                // commandHandlers.handleBagPaginationCommand(message, false);
+                await commandHandlers.handleBagCommand(message);
                 break;
+            case 'newbag':
+            case 'bagnew':
+                await handleBagCommand(message, false);
+                break;
+            case 'bagdm':
             case 'bag_dm':
-                commandHandlers.handleBagPaginationCommand(message, true);
+                await commandHandlers.handleBagPaginationCommand(message, true);
                 break;
             case 'monster':
                 commandHandlers.handleMonsterCommand(message, currentMonsterStateRef.current); // Pass current state
@@ -275,7 +283,7 @@ client.on('messageCreate', async (message) => {
         // --- END BOT MENTION CHECK ---
 
         // Pass necessary dependencies and the state reference object
-        gameLogic.handleExpGain(message, userCooldowns, announcementChannel, itemDropChannel, damageLogChannel, currentMonsterStateRef);
+        await gameLogic.handleExpGain(message, userCooldowns, announcementChannel, itemDropChannel, damageLogChannel, currentMonsterStateRef);
     }
 
     // Role Logging
@@ -298,13 +306,8 @@ client.on('messageCreate', async (message) => {
 // set discord `client` event listener
 client.on(Events.InteractionCreate, async (interaction) => {
     try {
-        console.error("Events.InteractionCreate : start!", interaction.customId);
-        if (
-            interaction.isStringSelectMenu() &&
-            interaction.customId.startsWith("shop_base") &&
-            shopWorkShopSettings
-        ) {
-            console.log("[Shop] Click Button : ", interaction.customId);
+        if (interaction.customId) console.error("Events.InteractionCreate : start!", interaction.customId);
+        if (interaction.isStringSelectMenu() && interaction.customId.startsWith("shop_base") && shopWorkShopSettings) {
             await handleShopSelectMenuClick(interaction, shopWorkShopSettings);
             return;
         }
@@ -319,6 +322,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
         if (interaction.commandName === "send") {
             await handleSendCommand(interaction);
+            return;
+        }
+        if (interaction.isButton() && interaction.customId.startsWith('bag_nav_')) { // bag navigation button interaction received
+            await handleBagPaginationInteraction(interaction);
             return;
         }
     } catch (error) {

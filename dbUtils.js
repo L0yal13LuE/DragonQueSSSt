@@ -108,14 +108,14 @@ const getMonsterForDate = async (dateString) => {
         const { data, error } = await supabase
             .from('event_monster')
             .select('*')
-            .eq('spawn_date', dateString)
-            .single(); // Only one monster per date
+            .eq('spawn_date', dateString);
+            // .single(); // Only one monster per date
 
         if (error && error.code !== 'PGRST116') { // Ignore 'not found' error
             console.error(`Error fetching monster for date ${dateString}:`, error.message);
             return null;
         }
-        return data; // Returns null if not found (PGRST116)
+        return data && data.length > 0 ? data[0] : null; // Returns null if not found (PGRST116)
     } catch (error) {
         console.error(`Unexpected error fetching monster for ${dateString}:`, error);
         return null;
@@ -222,8 +222,8 @@ const markMonsterAsDefeated = async (monsterDate, killerUserId, finalHp = 0) => 
             .update(updateData)
             .eq('spawn_date', monsterDate)
             .eq('is_alive', true)
-            .select()
-            .single();
+            .select();
+            // .single();
 
         if (error) {
             if (error.code !== 'PGRST116') {
@@ -234,7 +234,7 @@ const markMonsterAsDefeated = async (monsterDate, killerUserId, finalHp = 0) => 
             return null;
         }
         console.log(`Monster ${monsterDate} successfully marked as defeated by ${killerUserId}.`);
-        return data;
+        return data && data.length > 0 ? data[0] : null;
     } catch (error) {
         console.error(`Unexpected error marking monster ${monsterDate} defeated:`, error);
         return null;
@@ -271,7 +271,7 @@ const markRewardAnnounced = async (dateString) => {
  * @returns {Promise<boolean>} True if deletion was successful or no rows needed deleting, false on error. */
 const deleteMonsterHits = async (monsterDate) => {
     if (!supabase) { console.error(`[DeleteHits] Supabase client unavailable (likely not initialized).`); return false; }
-    console.log(`[DeleteHits] Attempting deletion for date: '${monsterDate}' (Type: ${typeof monsterDate})`);
+    // console.log(`[DeleteHits] Attempting deletion for date: '${monsterDate}' (Type: ${typeof monsterDate})`);
 
     try {
         // Check if rows exist first

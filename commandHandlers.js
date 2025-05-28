@@ -220,7 +220,7 @@ const handleBagPaginationCommand = async (message, isDM = false) => {
 		const username = message.author.username;
 
 		const userItems = await getUserItem({
-			userId: userId
+			userId: userId, amount: 1
 		});
 
 		if (isDM) {
