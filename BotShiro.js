@@ -28,7 +28,7 @@ const { handleShopCommand, handleShopSelectMenuClick } = require('./managers/sho
 const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
 // const { handleSendCommand } = require('./slashCommandHandler.js');
-const { handleSendCommand } = require('./slashCommandHandlerV2.js');
+const { handleSendCommand } = require('./slashCommandHandler.js');
 const { handleBagCommand, handleBagPaginationInteraction} = require('./managers/bagPaginationManager.js');
 
 // --- Configuration ---
