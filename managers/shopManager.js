@@ -117,7 +117,7 @@ const handleShopCommand = async (message, args) => {
             try {
                 if (instanceTimeout) clearTimeout(instanceTimeout);
                 await reply.delete();
-                await message.reply('**Shop session closed.** Use `!shop` to open again.');
+                await message.reply('*Shop session closed.*');
             } catch (errorDel) {
                 console.error('Error deleting message:', errorDel);
             }

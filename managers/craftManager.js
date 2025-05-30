@@ -2,6 +2,7 @@
 
 // --- Required Libraries ---
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
+const { supabase } = require('../supabaseClient');
 const { createBaseEmbed } = require("./embedManager");
 const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/materialProvider");
 
@@ -26,15 +27,17 @@ const handleCraftCommand = async (message, args) => {
         const lettesArray = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
         args.items.forEach((item, index) => {
             // Add the item as a field to the embed
-            let itemLetter = lettesArray[index];
-            const materialRowArray = item.materials.map(row => `${row.materials.emoji} ${row.materials.name} x ${row.amount}`);
-            // main row
-            const mainrow = {
-                name: `:regional_indicator_${itemLetter.toLowerCase()}: — ${item.emoji} ${item.name}`, // Combine emoji and item name for the field name
-                value: `Required: ${materialRowArray.join(", ")}`, // Display the price in the value
-                inline: false // Set to true to display items side-by-side if they fit (up to 3 per row usually)
-            };
-            baseEmbed.addFields(mainrow);
+            if (item.materials.length != 0) {
+                let itemLetter = lettesArray[index];
+                const materialRowArray = item.materials.map(row => `${row.materials.emoji} ${row.materials.name} x ${row.amount}`);
+                // main row
+                const mainrow = {
+                    name: `:regional_indicator_${itemLetter.toLowerCase()}: — ${item.emoji} ${item.name}`,
+                    value: `Required: ${materialRowArray.join(", ")}`,
+                    inline: false 
+                };
+                baseEmbed.addFields(mainrow);
+            }
         });
 
         baseEmbed.addFields({
@@ -47,21 +50,23 @@ const handleCraftCommand = async (message, args) => {
         let rows = [];
         let currentRow = new ActionRowBuilder();
         args.items.forEach((item, index) => {
-            // const uniqueItemId = `${item.name}`;
-            let itemLetter = lettesArray[index];
-            let button = new ButtonBuilder()
-                .setCustomId(`craft_${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}_${userId}`)
-                .setLabel(itemLetter) // Button text
-                .setStyle(ButtonStyle.Primary); // Use a primary button style
+            if (item.materials.length != 0) {
+                // const uniqueItemId = `${item.name}`;
+                let itemLetter = lettesArray[index];
+                let button = new ButtonBuilder()
+                    .setCustomId(`craft_${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}_${userId}`)
+                    .setLabel(itemLetter) // Button text
+                    .setStyle(ButtonStyle.Primary); // Use a primary button style
 
-            // Add button to the current row
-            currentRow.addComponents(button);
+                // Add button to the current row
+                currentRow.addComponents(button);
 
-            // If the current row has 5 buttons or it's the last item, push the row and start a new one
-            if (currentRow.components.length === 5 || index === args.items.length - 1) {
-                rows.push(currentRow);
-                if (index < args.items.length - 1) { // Don't create a new row if it's the very last item
-                    currentRow = new ActionRowBuilder();
+                // If the current row has 5 buttons or it's the last item, push the row and start a new one
+                if (currentRow.components.length === 5 || index === args.items.length - 1) {
+                    rows.push(currentRow);
+                    if (index < args.items.length - 1) { // Don't create a new row if it's the very last item
+                        currentRow = new ActionRowBuilder();
+                    }
                 }
             }
         });
@@ -80,7 +85,7 @@ const handleCraftCommand = async (message, args) => {
             } catch (errorDel) {
                 console.error('Error deleting message:', errorDel);
             }
-            await message.reply('**Crafting session closed.** Use `!craft` to open again.');
+            await message.reply('*Craft session closed.*');
         }, autoCloseTimer);
     } catch (error) {
         console.error('Error sending shop embed with buttons:', error);
@@ -195,7 +200,7 @@ const handleCraftButtonClick = async (interaction, args) => {
                     const userInsObj = { id: reqMaterialID, name: reqMaterialName };
                     craftSuccess = await insertUserItem(userUpdObj, userInsObj, 1);
                 }
-                
+
                 if (craftSuccess) {
                     // announce message to user/channel
                     await interaction.editReply(`Success: You crafted **${itemToCraft.emoji} ${itemToCraft.name}**`);
@@ -214,8 +219,41 @@ const handleCraftButtonClick = async (interaction, args) => {
         }
     }
 }
+
+const clanCraftChannels = async (clanNumber) => {
+    try {
+        const channelData = await getChannelIdForClanCraft(clanNumber);
+        if (!channelData) return null;
+        return channelData;
+    } catch (error) {
+        console.error(`Unexpected error fetching crafts for ${clanNumber}:`, error);
+        return null;
+    }
+}
+
+const getChannelIdForClanCraft = async (clanNumber) => {
+    try {
+        const { data: channelsData, error } = await supabase.from('craft_clan')
+            .select('*')
+            .eq('number', clanNumber)
+            .eq('is_active', true);
+
+        if (error) {
+            console.error(`Error fetching channel for clan ${clanNumber}:`, error.message);
+            return false;
+        }
+
+        return channelsData;
+    } catch (error) {
+        console.error(`Unexpected error fetching channel for ${clanNumber}:`, error);
+        return false;
+    }
+}
+
+
 // --- Command Export ---
 module.exports = {
     handleCraftCommand,
-    handleCraftButtonClick
+    handleCraftButtonClick,
+    clanCraftChannels
 };
