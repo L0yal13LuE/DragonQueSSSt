@@ -214,7 +214,7 @@ const getShopMaterialsForSell = async () => {
     const today = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
     const cacheDir = CACHE_MAT_SELL_DIR;
     if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
-    const cacheFile = join(cacheDir, `${today}_shop_materials.json`);
+    const cacheFile = join(cacheDir, `shop_clan_${today}.json`);
 
     try {
         if (fs.existsSync(cacheFile)) {
@@ -272,7 +272,110 @@ const getShopMaterialsForSell = async () => {
     }
 }
 
+const clanShopChannels = async (clanNumber) => {
+    try {
+        const channelData = await getChannelIdForClanShop(clanNumber);
+        if (!channelData) return null;
+        const channelIDs = channelData.map((row) => row.channel_id);
+        return channelIDs;
+    } catch (error) {
+        console.error(`Unexpected error fetching shop for ${clanNumber}:`, error);
+        return null;
+    }
+}
+
+const getChannelIdForClanShop = async (clanNumber) => {
+    try {
+        const { data: channelsData, error } = await supabase.from('shop_clan')
+            .select('channel_id')
+            .eq('number', clanNumber)
+            .eq('is_active', true);
+
+        if (error) {
+            console.error(`Error fetching channel for clan ${clanNumber}:`, error.message);
+            return null;
+        }
+
+        return channelsData;
+    } catch (error) {
+        console.error(`Unexpected error fetching channel for ${clanNumber}:`, error);
+        return null;
+    }
+}
+
+const clanShopSetting = async (channelId) => {
+
+    try {
+        if (!supabase) { console.error("[shopSettings] Supabase client not available."); return null; } // Or handle differently
+
+        // define default value
+        let title = 'Master Shiro\'s Shop';
+        let description = 'Welcome, See what wares I have for sale';
+        let thumbnail = '<URL>';
+        let image = '<URL>';
+        let footer = 'Hope you like it!';
+        let itemsForSellMaster = [];
+
+        // Get shop data by channel id
+        const shopData = await getShop(channelId);
+
+        // There was a bug in your console.log - fixed it to show the shop data
+        // console.log('Shop Data:', shopData);
+
+        if (shopData) {
+            title = shopData.title || title;
+            description = shopData.description || description;
+            thumbnail = shopData.thumbnail || thumbnail;
+            image = shopData.image || image;
+            footer = shopData.footer || footer;
+
+            // Get items in this shop
+            const shopItemCurrency = await getShopItems(shopData.id);
+            const shopItems = shopItemCurrency;
+
+            // console.log('Shop Items:', shopItems);
+            // console.log('Shop Materials:', shopMaterials);
+
+            // Check if shopItems is not null and has items
+            if (shopItems && shopItems.length > 0) {
+                itemsForSellMaster = shopItems;
+            }
+        } else {
+            console.log('No shop found for channel', channelId);
+            return;
+        }
+
+        let items = itemsForSellMaster;
+
+        // add letters indicators to items
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+        items.forEach((item, index) => {
+            item.letter = letters[index];
+        });
+
+        // console.log("Shop items:", items); // Log the items to check if they are fetched correctly
+
+        const shopSettings = {
+            channelId,
+            title,
+            description,
+            thumbnail,
+            image,
+            footer,
+            items,
+            instance: new Map(),
+            instanceTimeout: new Map()
+        };
+        return shopSettings;
+    } catch (error) {
+        console.error("Error in shopSettings:", error);
+        return false;
+    }
+}
+
 module.exports = {
     shopSettings,
-    craftSettings
+    craftSettings,
+    clanShopChannels,
+    clanShopSetting
 };

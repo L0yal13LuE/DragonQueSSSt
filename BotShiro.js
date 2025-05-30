@@ -23,13 +23,13 @@ const { handleMaterialCommand } = require('./managers/materialManager.js');
 
 // -- Addition Command Handlers ---
 const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
-const { shopSettings, craftSettings } = require('./managers/shopWorkshop.js');
+const { shopSettings, craftSettings, clanShopChannels, clanShopSetting } = require('./managers/shopWorkshop.js');
 const { handleShopCommand, handleShopSelectMenuClick } = require('./managers/shopManager.js');
 const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
 // const { handleSendCommand } = require('./slashCommandHandler.js');
 const { handleSendCommand } = require('./slashCommandHandler.js');
-const { handleBagCommand, handleBagPaginationInteraction} = require('./managers/bagPaginationManager.js');
+const { handleBagCommand, handleBagPaginationInteraction } = require('./managers/bagPaginationManager.js');
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -79,6 +79,7 @@ let currentMonsterStateRef = { current: null };
 // -- Shop instance
 let shopWorkShopSettings = null;
 let craftWorkShopSettings = null;
+const clanShopSettingData = new Map();
 
 // --- Bot Ready Event ---
 client.once('ready', async () => {
@@ -201,14 +202,30 @@ client.once('ready', async () => {
     // Setup Hourly Monster Check
     if (supabase && announcementChannel) {
         try {
-        console.log("Setting up hourly monster check...");
-        await gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef); // Initial check on startup
-        setInterval(() => gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef), CONSTANTS.HOURLY_CHECK_INTERVAL);
-        console.log(`Hourly monster check scheduled every ${CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)} minutes.`);
+            console.log("Setting up hourly monster check...");
+            await gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef); // Initial check on startup
+            setInterval(() => gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef), CONSTANTS.HOURLY_CHECK_INTERVAL);
+            console.log(`Hourly monster check scheduled every ${CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)} minutes.`);
         } catch (error) { console.error("Error setting up hourly monster check:", error); }
     } else {
         console.warn("Hourly monster check cannot be started: Supabase or Announcement Channel unavailable.");
     }
+
+    // Spawn clan shop from s1-s24
+    const clanNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], clanNumbersInitial = [];
+    await Promise.all(clanNumbers.map(async (clanNumber) => {
+        const channels = await clanShopChannels(clanNumber);
+        if (channels && channels.length > 0) {
+            await Promise.all(channels.map(async (channelID) => {
+                const shopSetting = await clanShopSetting(channelID.toString());
+                if (shopSetting) {
+                    clanShopSettingData.set(channelID.toString(), shopSetting);
+                } else clanShopSettingData.delete(channelID.toString());
+            }));
+            clanNumbersInitial.push({ clanNumber, channels });
+        }
+    }));
+    console.log(`[Clan Shop] : Loaded ${clanNumbersInitial.length} clan shop channels.`);
 });
 
 // --- Message Create Event ---
@@ -231,6 +248,15 @@ client.on('messageCreate', async (message) => {
             case 'shop':
                 if (shopWorkShopSettings) {
                     shopWorkShopSettings = await handleShopCommand(message, shopWorkShopSettings);
+                }
+                break;
+            case 'shop_clan':
+            case 'shop-clan':
+            case 'shopclan':
+                // check if message channel id matching clan shop settiings channel ids
+                if (clanShopSettingData.has(message.channel.id.toString())) {
+                    const shopClanInitData = clanShopSettingData.get(message.channel.id.toString());
+                    if (shopClanInitData) await handleShopCommand(message, shopClanInitData);
                 }
                 break;
             case 'craft':
