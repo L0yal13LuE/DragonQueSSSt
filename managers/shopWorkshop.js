@@ -318,7 +318,7 @@ const getChannelIdForClanShop = async (clanNumber) => {
     }
 }
 
-const clanShopSetting = async (channelId) => {
+const clanShopSetting = async (channelId, clanNumber) => {
 
     try {
         if (!supabase) { console.error("[shopSettings] Supabase client not available."); return null; } // Or handle differently
@@ -372,6 +372,7 @@ const clanShopSetting = async (channelId) => {
 
         const shopSettings = {
             channelId,
+            clanNumber: clanNumber,
             title,
             description,
             thumbnail,
@@ -389,7 +390,7 @@ const clanShopSetting = async (channelId) => {
 }
 
 
-const craftClanSettings = async (craftClanData) => {
+const craftClanSettings = async (craftClanData, clanNumber) => {
     if (!supabase) { console.error("[shopSettings] Supabase client not available."); return null; } // Or handle differently
 
     const getCraftCommand = async () => {
@@ -516,6 +517,7 @@ const craftClanSettings = async (craftClanData) => {
             // Now fieldsItems is populated with all items
             const craftSettingObj = {
                 channelId: '0',
+                clanNumber: clanNumber,
                 title: craftCommand.title,
                 description: description,
                 items: fieldsItems

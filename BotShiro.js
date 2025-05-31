@@ -220,7 +220,7 @@ client.once('ready', async () => {
         const channelsCraft = await clanCraftChannels(clanNumber)
         if (channelsCraft && channelsCraft.length > 0) {
             const craftSettingPromises = channelsCraft.map(async (row) => {
-                const craftSetting = await craftClanSettings(row);
+                const craftSetting = await craftClanSettings(row, clanNumber);
                 return { ...row, setting: craftSetting };
             });
             clanCraftSettingData = await Promise.all(craftSettingPromises);
@@ -232,7 +232,7 @@ client.once('ready', async () => {
 
             // fetch shop data for each channel in clan
             await Promise.all(channels.map(async (channelID) => {
-                const shopSetting = await clanShopSetting(channelID);
+                const shopSetting = await clanShopSetting(channelID, clanNumber);
                 if (shopSetting) {
                     clanShopSettingData.set(channelID, shopSetting);
                 } else clanShopSettingData.delete(channelID);
