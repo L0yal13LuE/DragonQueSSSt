@@ -30,6 +30,7 @@ const { getConfig } = require('./providers/configProvider.js'); // For loading d
 // const { handleSendCommand } = require('./slashCommandHandler.js');
 const { handleSendCommand } = require('./slashCommandHandler.js');
 const { handleBagCommand, handleBagPaginationInteraction } = require('./managers/bagPaginationManager.js');
+const { handleFishingCommand } = require('./managers/fishingManager.js');
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -316,6 +317,9 @@ client.on('messageCreate', async (message) => {
                 break;
             case 'material':
                 handleMaterialCommand(message); // Keep using the imported manager
+                break;
+            case 'fishing':
+                await handleFishingCommand(message);
                 break;
             // Add other commands here with their respective 'case' and 'break;'
             // default:
