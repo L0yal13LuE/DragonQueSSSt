@@ -84,11 +84,6 @@ const fetchUserItem = async (interaction) => {
       return;
     }
 
-    const masterRatities = fetchRarity();
-
-    if (!masterRatities) {
-    }
-
     // 3. Filter items in memory based on user's autocomplete input
     // The `amount: 1` filter was already applied when fetching for the cache.
     const filteredItems = allUserItemsData.filter(
@@ -111,7 +106,7 @@ const fetchUserItem = async (interaction) => {
     // 4. Respond with up to 25 choices for autocomplete
     await interaction.respond(
       filteredItems.slice(0, 25).map((i) => ({
-        name: `${i.material.name} ${i.material.emoji} (Own x ${i.amount})`,
+        name: `${i.material.rarities.emoji} ${i.material.name} ${i.material.emoji} x ${i.amount}`,
         value: i.material.id.toString(), // This is the material_id
       }))
     );

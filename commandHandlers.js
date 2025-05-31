@@ -1,4 +1,9 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} = require("discord.js");
 const { supabase } = require("./supabaseClient");
 const {
   getUser,
@@ -6,8 +11,10 @@ const {
   getTotalDamageDealt,
 } = require("./dbUtils");
 const { calculateNextLevelExp, getTodaysDateString } = require("./gameLogic");
-const { getUserItem } = require("./providers/materialProvider");
+const { getUserItem, getUserItemV2 } = require("./providers/materialProvider");
 const { createBagEmbed } = require("./managers/embedManager");
+const { getCachedData } = require("./managers/cacheManager");
+const CONSTANTS = require("./constants");
 
 /**
  * Handles the '!rank' command with a fancier embed and progress bar. Works in any channel.
@@ -109,21 +116,29 @@ const handleBagCommand = async (message) => {
   try {
     const userItems = await getUserItem({
       userId: message.author.id,
-      amount: 1
+      amount: 1,
     });
 
+    // Fetch rarities from cache
+    // raritiesArray should be an array of { id, name, emoji, drop_rate, ... }
+    const raritiesArray = await getCachedData(CONSTANTS.CACHE_RARITIES_PREFIX);
+
+    // Create a map for efficient lookup of rarities by id
+    const raritiesMap = new Map();
+    if (Array.isArray(raritiesArray)) {
+      raritiesArray.forEach((rarity) => raritiesMap.set(rarity.id, rarity));
+    } else {
+      console.warn(
+        `[handleBagCommand] ${CONSTANTS.CACHE_RARITIES_PREFIX} data from cache is not an array or is null. Rarity info might be missing.`
+      );
+    }
+
     const itemList =
-      Object.values(userItems).length > 0
-        ? Object.values(userItems)
-          .map(
-            (value) =>
-              `${value.material.emoji} ${value.material.name}: ${value.amount}`
-          )
-          .join("\n")
+      userItems && userItems.length > 0
+        ? userItems.map(item => `${item.material.rarities.emoji} ${item.material.name} ${item.material.emoji} x ${item.amount.toLocaleString()}`).join('\n')
         : "Your bag is empty... Chat to find some items!";
 
     const bagEmbed = createBagEmbed(message.author, itemList);
-
     message.reply({ embeds: [bagEmbed] });
     console.log(`[${message.author.username}] Replied to !bag.`);
   } catch (error) {
@@ -207,145 +222,161 @@ const handleMonsterCommand = async (message, currentMonsterState) => {
   }
 };
 
-
 const handleBagPaginationCommand = async (message, isDM = false) => {
-	
-	try {
-		const autoClose = 5;
-        const autoCloseTimer = (autoClose * 60) * 1000;
-        const expirationTimestamp = `<t:${Math.floor((Date.now() + autoClose * 60 * 1000) / 1000)}:R>`;
+  try {
+    const autoClose = 5;
+    const autoCloseTimer = autoClose * 60 * 1000;
+    const expirationTimestamp = `<t:${Math.floor(
+      (Date.now() + autoClose * 60 * 1000) / 1000
+    )}:R>`;
 
-		const ITEMS_PER_PAGE = 10;
-		const userId = message.author.id;
-		const username = message.author.username;
+    const ITEMS_PER_PAGE = 10;
+    const userId = message.author.id;
+    const username = message.author.username;
 
-		const userItems = await getUserItem({
-			userId: userId, amount: 1
-		});
+    const userItems = await getUserItemV2({
+      userId: userId,
+      amount: 1,
+    });
 
-		if (isDM) {
-			const itemList = Object.values(userItems).length > 0
-				? Object.values(userItems)
-				.map(
-					(value) =>
-					`${value.material.emoji} ${value.material.name}: ${value.amount}`
-				)
-				.join("\n")
-				: "Your bag is empty... Chat to find some items!";
+    if (isDM) {
+      const itemList =
+        userItems.count > 0
+          ? Object.values(userItems.data)
+              .map(
+                (value) =>
+                  `${value.material.rarities.emoji} ${value.material.name} ${value.material.emoji} x ${value.amount}`
+              )
+              .join("\n")
+          : "Your bag is empty... Chat to find some items!";
 
-			const bagEmbed = createBagEmbed(message.author, itemList + `\n\nThis is BOT auto generated message\nPlease do not reply to this message.`);
+      const bagEmbed = createBagEmbed(
+        message.author,
+        itemList +
+          `\n\nThis is BOT auto generated message\nPlease do not reply to this message.`
+      );
 
-			try {
-				await message.author.send({embeds: [bagEmbed]});
-				await message.reply(`✅ I've sent your bag contents to your DMs!`);
-			} catch (error) {
-				await message.reply(`❌ Please check setting to allow direct messages from server members.`);
-			}
-			return;
-		}
+      try {
+        await message.author.send({ embeds: [bagEmbed] });
+        await message.reply(`✅ I've sent your bag contents to your DMs!`);
+      } catch (error) {
+        await message.reply(
+          `❌ Please check setting to allow direct messages from server members.`
+        );
+      }
+      return;
+    }
 
+    // Initialize current page to 0 (first page)
+    let currentPage = 0;
+    const totalPages = Math.ceil(userItems.length / ITEMS_PER_PAGE);
 
-		// Initialize current page to 0 (first page)
-		let currentPage = 0;
-		const totalPages = Math.ceil(userItems.length / ITEMS_PER_PAGE);
+    // Function to create an embed for a specific page
+    const createEmbedItems = (page) => {
+      const start = page * ITEMS_PER_PAGE;
+      const end = start + ITEMS_PER_PAGE;
+      const itemsToShow = userItems.slice(start, end);
 
-		// Function to create an embed for a specific page
-		const createEmbedItems = (page) => {
-			const start = page * ITEMS_PER_PAGE;
-			const end = start + ITEMS_PER_PAGE;
-			const itemsToShow = userItems.slice(start, end);
+      const itemListText =
+        itemsToShow.length > 0
+          ? itemsToShow
+              .map(
+                (item, index) =>
+                  `${item.material.emoji} ${item.material.name}: ${item.amount}`
+              )
+              .join("\n")
+          : "Your bag is empty!";
 
-			const itemListText = itemsToShow.length > 0
-						? itemsToShow.map((item, index) => `${item.material.emoji} ${item.material.name}: ${item.amount}`).join('\n')
-						: 'Your bag is empty!';
+      const embed = new EmbedBuilder()
+        .setColor(0x0099ff) // Blue color for the embed
+        .setTitle(`${username}'s Bag, let's see what's inside!`)
+        .setDescription(
+          `${itemListText}\n\nExpire in ${autoClose} minute ${expirationTimestamp}\n\n`
+        )
+        .setFooter({ text: `Page ${page + 1} of ${totalPages}` });
 
-			const embed = new EmbedBuilder()
-				.setColor(0x0099FF) // Blue color for the embed
-				.setTitle(`${username}'s Bag, let's see what's inside!`)
-				.setDescription(`${itemListText}\n\nExpire in ${autoClose} minute ${expirationTimestamp}\n\n`)
-				.setFooter({ text: `Page ${page + 1} of ${totalPages}` });
+      return embed;
+    };
 
-			return embed;
-		};
+    // Create the initial embed and buttons
+    const initialEmbed = createEmbedItems(currentPage);
 
-		// Create the initial embed and buttons
-		const initialEmbed = createEmbedItems(currentPage);
+    // Create action row for pagination buttons
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`bag_first_${userId}`)
+        .setLabel("<<")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(currentPage === 0), // Disable if on the first page
+      new ButtonBuilder()
+        .setCustomId(`bag_prev_${userId}`)
+        .setLabel("<")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(currentPage === 0), // Disable if on the first page
+      new ButtonBuilder()
+        .setCustomId(`bag_next_${userId}`)
+        .setLabel(">")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(currentPage >= totalPages - 1), // Disable if on the last page
+      new ButtonBuilder()
+        .setCustomId(`bag_last_${userId}`)
+        .setLabel(">>")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(currentPage >= totalPages - 1) // Disable if on the last page
+    );
+    // Send the initial message with the embed and buttons
+    const replyMessage = await message.reply({
+      embeds: [initialEmbed],
+      components: [row],
+      fetchReply: true, // Needed to fetch the message object for the collector
+    });
 
-		// Create action row for pagination buttons
-		const row = new ActionRowBuilder()
-			.addComponents(
-				new ButtonBuilder()
-					.setCustomId(`bag_first_${userId}`)
-					.setLabel('<<')
-					.setStyle(ButtonStyle.Secondary)
-					.setDisabled(currentPage === 0), // Disable if on the first page
-				new ButtonBuilder()
-					.setCustomId(`bag_prev_${userId}`)
-					.setLabel('<')
-					.setStyle(ButtonStyle.Secondary)
-					.setDisabled(currentPage === 0), // Disable if on the first page
-				new ButtonBuilder()
-					.setCustomId(`bag_next_${userId}`)
-					.setLabel('>')
-					.setStyle(ButtonStyle.Secondary)
-					.setDisabled(currentPage >= totalPages - 1), // Disable if on the last page
-				new ButtonBuilder()
-					.setCustomId(`bag_last_${userId}`)
-					.setLabel('>>')
-					.setStyle(ButtonStyle.Secondary)
-					.setDisabled(currentPage >= totalPages - 1), // Disable if on the last page
-			);
-		// Send the initial message with the embed and buttons
-		const replyMessage = await message.reply({
-			embeds: [initialEmbed],
-			components: [row],
-			fetchReply: true // Needed to fetch the message object for the collector
-		});
+    // Create a collector to listen for button interactions on this specific message
+    const collector = replyMessage.createMessageComponentCollector({
+      filter: (i) => i.user.id === message.author.id, // Only allow the command invoker to interact
+      time: autoCloseTimer - 5000, // Collector will expire after 60*5=300 seconds (300000 milliseconds)
+    });
 
-		// Create a collector to listen for button interactions on this specific message
-		const collector = replyMessage.createMessageComponentCollector({
-			filter: (i) => i.user.id === message.author.id, // Only allow the command invoker to interact
-			time: (autoCloseTimer - 5000) // Collector will expire after 60*5=300 seconds (300000 milliseconds)
-		});
+    // Handle button interactions
+    collector.on("collect", async (i) => {
+      if (i.customId === `bag_prev_${userId}`) {
+        currentPage--;
+      } else if (i.customId === `bag_next_${userId}`) {
+        currentPage++;
+      } else if (i.customId === `bag_first_${userId}`) {
+        currentPage = 0;
+      } else if (i.customId === `bag_last_${userId}`) {
+        currentPage = totalPages - 1;
+      }
 
-		// Handle button interactions
-		collector.on('collect', async (i) => {
-			if (i.customId === `bag_prev_${userId}`) {
-				currentPage--;
-			} else if (i.customId === `bag_next_${userId}`) {
-				currentPage++;
-			} else if (i.customId === `bag_first_${userId}`) {
-				currentPage=0;
-			} else if (i.customId === `bag_last_${userId}`) {
-				currentPage=totalPages-1;
-			}
+      // Update the embed and button states
+      const updatedEmbed = createEmbedItems(currentPage);
+      row.components[0].setDisabled(currentPage === 0); // First button
+      row.components[1].setDisabled(currentPage === 0); // Previous button
+      row.components[2].setDisabled(currentPage >= totalPages - 1); // Next button
+      row.components[3].setDisabled(currentPage >= totalPages - 1); // Last button
 
-			// Update the embed and button states
-			const updatedEmbed = createEmbedItems(currentPage);
-			row.components[0].setDisabled(currentPage === 0); // First button
-			row.components[1].setDisabled(currentPage === 0); // Previous button
-			row.components[2].setDisabled(currentPage >= totalPages - 1); // Next button
-			row.components[3].setDisabled(currentPage >= totalPages - 1); // Last button
+      // Update the original message with the new embed and button states
+      await i.update({
+        embeds: [updatedEmbed],
+        components: [row],
+      });
+    });
 
-			// Update the original message with the new embed and button states
-			await i.update({
-				embeds: [updatedEmbed],
-				components: [row]
-			});
-		});
-
-		// auto delete after 5 minute
+    // auto delete after 5 minute
     setTimeout(async () => {
-        try {
-            await replyMessage.delete();
-        } catch (errorDel) {
-            console.error('Error deleting message:', errorDel);
-        }
-        await message.reply('**Bag closed.** Use `!bag` to open again.\n*If you want to keep your items private, use `!bag_dm` instead (please allow dm in your settings)*');
-    }, (autoCloseTimer));
-	} catch (error) {
-		console.error('Error while handling !bag pagination command:', error);
-	}
+      try {
+        await replyMessage.delete();
+      } catch (errorDel) {
+        console.error("Error deleting message:", errorDel);
+      }
+      await message.reply(
+        "**Bag closed.** Use `!bag` to open again.\n*If you want to keep your items private, use `!bag_dm` instead (please allow dm in your settings)*"
+      );
+    }, autoCloseTimer);
+  } catch (error) {
+    console.error("Error while handling !bag pagination command:", error);
+  }
 };
 
 module.exports = {
@@ -353,5 +384,5 @@ module.exports = {
   handleChatCommand,
   handleBagCommand,
   handleMonsterCommand,
-  handleBagPaginationCommand
+  handleBagPaginationCommand,
 };
