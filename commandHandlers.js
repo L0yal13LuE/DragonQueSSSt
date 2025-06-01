@@ -153,9 +153,8 @@ const handleMonsterCommand = async (message, currentMonsterState) => {
 
     if (monsterData) {
       let status = monsterData.is_alive ? "⚔️" : "☠️";
-      let remainingHpText = "0";
       let color = monsterData.is_alive ? 0xff4500 : 0x32cd32; // Orange if alive, Green if dead
-
+      let remainingHpText = "0";
       if (monsterData.is_alive) {
         const totalDamage = await getTotalDamageDealt(today);
         const remainingHp = Math.max(0, monsterData.max_hp - totalDamage);
@@ -167,8 +166,8 @@ const handleMonsterCommand = async (message, currentMonsterState) => {
       }
 
       let latestHpRow = `${remainingHpText} / ${monsterData.max_hp}`;
-      if (parseInt(remainingHp) < (parseInt(monsterData.max_hp) * 0.2)) latestHpRow ='Low'; // hp less than 20%
-      if (parseInt(remainingHp) < (parseInt(monsterData.max_hp) * 0.1)) latestHpRow = 'Very Low'; // hp less than 10%
+      if (parseInt(remainingHpText) < (parseInt(monsterData.max_hp) * 0.2)) latestHpRow ='Low'; // hp less than 20%
+      if (parseInt(remainingHpText) < (parseInt(monsterData.max_hp) * 0.1)) latestHpRow = 'Very Low'; // hp less than 10%
 
       const monsterEmbed = new EmbedBuilder()
         .setColor(color)
