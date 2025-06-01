@@ -33,9 +33,9 @@ const shopSettings = async (channelId, client) => {
             footer = shopData.footer || footer;
 
             // Get items in this shop
-            const shopItemCurrency = await getShopItems(shopData.id);
-            const shopMaterials = await getShopMaterialsForSell();
-            const shopItems = shopItemCurrency.concat(shopMaterials);
+            // const shopItemCurrency = await getShopItems(shopData.id);
+            // const shopMaterials = await getShopMaterialsForSell();
+            const shopItems = await getShopMaterialsForSell();
 
             // console.log('Shop Items:', shopItems);
             // console.log('Shop Materials:', shopMaterials);
@@ -45,7 +45,7 @@ const shopSettings = async (channelId, client) => {
                 itemsForSellMaster = shopItems;
             }
         } else {
-            console.log('No shop found for channel', channelId);
+            // console.log('No shop found for channel', channelId);
             return;
         }
 
@@ -84,60 +84,75 @@ const craftSettings = async (command, client) => {
     if (!supabase) { console.error("[shopSettings] Supabase client not available."); return null; } // Or handle differently
 
     const getCraftCommand = async () => {
-        const { data, error } = await supabase
-            .from('crafts')
-            .select('*')
-            .eq('command', command)
-            .eq('is_active', true)
-            .single();
+        try {
+            const { data, error } = await supabase
+                .from('crafts')
+                .select('*')
+                .eq('command', command)
+                .eq('is_active', true)
+                .single();
 
-        if (error) {
+            if (error) {
+                console.error("Error fetching craft command:", error);
+                return false;
+            }
+
+            if (!data) {
+                console.log("Craft command not found or not active.");
+                return false;
+            }
+            return data;
+        } catch (error) {
             console.error("Error fetching craft command:", error);
             return false;
         }
-
-        if (!data) {
-            console.log("Craft command not found or not active.");
-            return false;
-        }
-        return data;
     }
 
     const getCraftSubCommand = async () => {
-        const { data, error } = await supabase
-            .from('crafts')
-            .select('*')
-            .like('command', `${command} %`)
-            .eq('is_active', true)
-            .order('id', { ascending: true });
+        try {
+            const { data, error } = await supabase
+                .from('crafts')
+                .select('*')
+                .like('command', `${command} %`)
+                .eq('is_active', true)
+                .order('id', { ascending: true });
 
-        if (error) {
+            if (error) {
+                console.error("Error fetching craft sub-command:", error);
+                return false;
+            }
+            if (!data) {
+                console.log("Craft sub-command not found or not active.");
+                return false;
+            }
+            return data;
+        } catch (error) {
             console.error("Error fetching craft sub-command:", error);
             return false;
         }
-        if (!data) {
-            console.log("Craft sub-command not found or not active.");
-            return false;
-        }
-        return data;
     }
 
     const getCraftSubCommandItems = async (craftId) => {
-        // console.log("Fetching craft materials for craft ID:", craftId);
-        const { data: dataArray, error } = await supabase
-            .from('craft_materials')
-            .select('id, material_id, amount, materials(emoji, name)')
-            .eq('craft_id', craftId)
-            .eq('is_active', true)
-            .eq('materials.is_active', true)
-            .order('amount', { ascending: false })
-            .order('material_id', { ascending: true });
-        if (error) {
-            console.error("Supabase query error (fetchCraftMaterials):", error);
-            return false;
+        try {
+            // console.log("Fetching craft materials for craft ID:", craftId);
+            const { data: dataArray, error } = await supabase
+                .from('craft_materials')
+                .select('id, material_id, amount, materials(emoji, name)')
+                .eq('craft_id', craftId)
+                .eq('is_active', true)
+                .eq('materials.is_active', true)
+                .order('amount', { ascending: false })
+                .order('material_id', { ascending: true });
+            if (error) {
+                console.error("Supabase query error (fetchCraftMaterials):", error);
+                return false;
+            }
+            // console.log(`Fetched ${dataArray.length} materials for craft ID: ${craftId}`);
+            return dataArray;
+        } catch (error) {
+            console.error("Error fetching craft sub-command items:", error);
+            return [];
         }
-        // console.log(`Fetched ${dataArray.length} materials for craft ID: ${craftId}`);
-        return dataArray;
     }
 
     try {
@@ -214,7 +229,7 @@ const getShopMaterialsForSell = async () => {
     const today = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
     const cacheDir = CACHE_MAT_SELL_DIR;
     if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
-    const cacheFile = join(cacheDir, `${today}_shop_materials.json`);
+    const cacheFile = join(cacheDir, `shop_clan_${today}.json`);
 
     try {
         if (fs.existsSync(cacheFile)) {
@@ -237,13 +252,13 @@ const getShopMaterialsForSell = async () => {
         const buildPrice = (rarity_id) => {
             switch (rarity_id) {
                 case 1:
-                    return 10;
+                    return 4;
                 case 2:
-                    return 15;
+                    return 7;
                 case 3:
-                    return 30;
+                    return 12;
                 default:
-                    return 10;
+                    return 12;
             }
         };
 
@@ -259,7 +274,8 @@ const getShopMaterialsForSell = async () => {
                 is_active: true,
                 material_id: row.id,
                 amount: 1,
-                material_use_id: 68, // use Como
+                material_use_id: 1, // use Como (previously Stardust)
+                // material_use_id: 68, // use Como
                 materials: { id: row.id, name: row.name, emoji: row.emoji }
             };
         });

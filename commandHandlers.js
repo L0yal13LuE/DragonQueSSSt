@@ -166,6 +166,10 @@ const handleMonsterCommand = async (message, currentMonsterState) => {
         }
       }
 
+      let latestHpRow = `${remainingHpText} / ${monsterData.max_hp}`;
+      if (parseInt(remainingHp) < (parseInt(monsterData.max_hp) * 0.2)) latestHpRow ='Low'; // hp less than 20%
+      if (parseInt(remainingHp) < (parseInt(monsterData.max_hp) * 0.1)) latestHpRow = 'Very Low'; // hp less than 10%
+
       const monsterEmbed = new EmbedBuilder()
         .setColor(color)
         .setTitle(`👽 Today's Monster Status (${today}) 🦑`)
@@ -174,7 +178,7 @@ const handleMonsterCommand = async (message, currentMonsterState) => {
           { name: "Status", value: `**${status}**`, inline: true },
           {
             name: "HP",
-            value: `${remainingHpText} / ${monsterData.max_hp}`,
+            value: latestHpRow,
             inline: true,
           }
         )
