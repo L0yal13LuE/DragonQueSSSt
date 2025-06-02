@@ -26,7 +26,7 @@ const createBagPageEmbed = (username, userItems, page, totalPages, expirationTim
     const itemsToShow = userItems.slice(start, end);
 
     const itemListText = itemsToShow.length > 0
-        ? itemsToShow.map(item => `${item.material.emoji} ${item.material.name}: ${item.amount.toLocaleString()}`).join('\n')
+        ? itemsToShow.map(item => `${item.material.rarities.emoji} ${item.material.name} ${item.material.emoji} x ${item.amount.toLocaleString()}`).join('\n')
         : 'Your bag is empty!';
 
     return new EmbedBuilder()

@@ -95,7 +95,9 @@ const getUserItem = async (filters = {}) => {
   try {
     let query = supabase
       .from("user_material")
-      .select("id, amount, material:materials(id, name, emoji)");
+      .select(
+        "id, amount, material:materials(id, name, emoji, rarity_id, rarities(id, name, emoji, drop_rate))"
+      );
 
     if ("userId" in filters) {
       query = query.eq("user_id", filters.userId);
@@ -134,7 +136,9 @@ const getUserItemV2 = async (filters = {}, page = 0, limit = -1) => {
   try {
     let query = supabase
       .from("user_material")
-      .select("id, amount, material:materials(id, name, emoji)", { count: 'exact' }); // Get total count
+      .select("id, amount, material:materials(id, name, emoji, rarities(id, name, emoji, drop_rate))", {
+        count: "exact",
+      }); // Get total count
 
     if ("userId" in filters) {
       query = query.eq("user_id", filters.userId);
@@ -157,12 +161,15 @@ const getUserItemV2 = async (filters = {}, page = 0, limit = -1) => {
 
     // Apply sorting at the database level for consistency across pages
     // Sorting by the joined table 'materials' field 'name'
-    query = query.order('name', { foreignTable: 'materials', ascending: true });
+    query = query.order("name", { foreignTable: "materials", ascending: true });
 
     let { data, error, count } = await query;
 
     if (error) {
-      console.error(`Supabase query error in getUserItem for UserID ${filters.userId}, Page ${page}:`, error);
+      console.error(
+        `Supabase query error in getUserItem for UserID ${filters.userId}, Page ${page}:`,
+        error
+      );
       return { data: null, count: 0, error };
     }
 
@@ -264,5 +271,5 @@ module.exports = {
   insertUserItem,
   updateUserItem,
   updateUserItemV2,
-  getUserItemV2
+  getUserItemV2,
 };

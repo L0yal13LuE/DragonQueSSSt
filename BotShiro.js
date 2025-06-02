@@ -29,16 +29,15 @@ const { handleCraftCommand, handleCraftButtonClick, clanCraftChannels } = requir
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
 // const { handleSendCommand } = require('./slashCommandHandler.js');
 const { handleSendCommand } = require('./slashCommandHandler.js');
-const { handleBagCommand, handleBagPaginationInteraction } = require('./managers/bagPaginationManager.js');
-const { handleFishingCommand } = require('./managers/fishingManager.js');
+const { handleBagCommand, handleBagPaginationInteraction} = require('./managers/bagPaginationManager.js');
+const { fetchRarity } = require('./managers/rarityManager.js');
+const { resetCachedDataOnStartUp } = require('./managers/cacheManager.js');
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
 const ANNOUNCEMENT_CHANNEL_ID = process.env.ANNOUNCEMENT_CHANNEL_ID; // For level-ups ONLY
 const ITEM_DROP_CHANNEL_ID = process.env.ITEM_DROP_CHANNEL_ID; // For item-drop- ONLY
-const DAMAGE_LOG = process.env.DAMAGE_LOG; // For item-drop- ONLY
-
-const CHANNEL_ID_1 = ANNOUNCEMENT_CHANNEL_ID;
+const DAMAGE_LOG_CHANNEL_ID = process.env.DAMAGE_LOG_CHANNEL_ID; // For item-drop- ONLY
 
 // --- Configuration Validation ---
 if (!TOKEN) {
@@ -106,11 +105,11 @@ client.once('ready', async () => {
     }
 
     // Fetch Channel Objects
-    if (DAMAGE_LOG) {
+    if (DAMAGE_LOG_CHANNEL_ID) {
         try {
-            damageLogChannel = await client.channels.fetch(DAMAGE_LOG);
+            damageLogChannel = await client.channels.fetch(DAMAGE_LOG_CHANNEL_ID);
             if (damageLogChannel) console.log(`Item damage log channel found: ${damageLogChannel.name}`);
-            else console.error(`Could not find damage log channel: ${DAMAGE_LOG}`);
+            else console.error(`Could not find damage log channel: ${DAMAGE_LOG_CHANNEL_ID}`);
         } catch (error) { console.error(`Error fetching damage log channel:`, error); damageLogChannel = null; }
     }
 
@@ -122,6 +121,9 @@ client.once('ready', async () => {
             else console.error(`Could not find item drop channel: ${ITEM_DROP_CHANNEL_ID}`);
         } catch (error) { console.error(`Error fetching item drop channel:`, error); itemDropChannel = null; }
     }
+
+    resetCachedDataOnStartUp();
+    await fetchRarity();
 
     // Send Online Announcement
     if (announcementChannel) {
@@ -317,9 +319,6 @@ client.on('messageCreate', async (message) => {
                 break;
             case 'material':
                 handleMaterialCommand(message); // Keep using the imported manager
-                break;
-            case 'fishing':
-                await handleFishingCommand(message);
                 break;
             // Add other commands here with their respective 'case' and 'break;'
             // default:

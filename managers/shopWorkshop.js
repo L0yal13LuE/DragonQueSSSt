@@ -33,9 +33,9 @@ const shopSettings = async (channelId, client) => {
             footer = shopData.footer || footer;
 
             // Get items in this shop
-            const shopItemCurrency = await getShopItems(shopData.id);
-            const shopMaterials = await getShopMaterialsForSell();
-            const shopItems = shopItemCurrency.concat(shopMaterials);
+            // const shopItemCurrency = await getShopItems(shopData.id);
+            // const shopMaterials = await getShopMaterialsForSell();
+            const shopItems = await getShopMaterialsForSell();
 
             // console.log('Shop Items:', shopItems);
             // console.log('Shop Materials:', shopMaterials);
@@ -252,13 +252,13 @@ const getShopMaterialsForSell = async () => {
         const buildPrice = (rarity_id) => {
             switch (rarity_id) {
                 case 1:
-                    return 10;
+                    return 4;
                 case 2:
-                    return 15;
+                    return 7;
                 case 3:
-                    return 30;
+                    return 12;
                 default:
-                    return 10;
+                    return 12;
             }
         };
 
@@ -274,7 +274,8 @@ const getShopMaterialsForSell = async () => {
                 is_active: true,
                 material_id: row.id,
                 amount: 1,
-                material_use_id: 68, // use Como
+                material_use_id: 1, // use Como (previously Stardust)
+                // material_use_id: 68, // use Como
                 materials: { id: row.id, name: row.name, emoji: row.emoji }
             };
         });

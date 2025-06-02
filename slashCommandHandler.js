@@ -1,8 +1,10 @@
 const {
-  getCachedUserBag,
-  saveUserBagCache,
-  deleteUserBagCache,
+  getCachedData,
+  saveCachedData,
+  deleteCachedData,
 } = require("./managers/cacheManager");
+
+const { fetchRarity } = require("./providers/rarityProvider");
 
 const { getMaterial, getUserItemV2 } = require("./providers/materialProvider");
 
@@ -28,11 +30,12 @@ const fetchUserItem = async (interaction) => {
   try {
     const itemNameInput = interaction.options.getString("item"); // User's input for autocomplete
     const userId = interaction.user.id;
+    const userBagKey = `bag_${userId}`;
 
     let allUserItemsData = null;
 
     if (itemNameInput === "") {
-      await deleteUserBagCache(userId);
+      await deleteCachedData(userBagKey);
 
       const result = await getUserItemV2({ userId: userId, amount: 1 }, 0, -1);
 
@@ -46,10 +49,10 @@ const fetchUserItem = async (interaction) => {
       }
       allUserItemsData = result.data;
       // Save the fetched data to cache
-      saveUserBagCache(userId, allUserItemsData);
+      saveCachedData(userBagKey, allUserItemsData);
     } else {
       // 1. Check cache for the user's entire bag
-      const cachedBag = await getCachedUserBag(userId);
+      const cachedBag = await getCachedData(userBagKey);
 
       if (cachedBag) {
         allUserItemsData = cachedBag;
@@ -72,7 +75,7 @@ const fetchUserItem = async (interaction) => {
         }
         allUserItemsData = result.data;
         // Save the fetched data to cache
-        saveUserBagCache(userId, allUserItemsData);
+        saveCachedData(userBagKey, allUserItemsData);
       }
     }
 
@@ -103,7 +106,7 @@ const fetchUserItem = async (interaction) => {
     // 4. Respond with up to 25 choices for autocomplete
     await interaction.respond(
       filteredItems.slice(0, 25).map((i) => ({
-        name: `${i.material.name} ${i.material.emoji} (Own x ${i.amount})`,
+        name: `${i.material.rarities.emoji} ${i.material.name} ${i.material.emoji} x ${i.amount}`,
         value: i.material.id.toString(), // This is the material_id
       }))
     );
@@ -243,8 +246,8 @@ const handleSendCommandSubmission = async (interaction) => {
         `✅ **${sender.username}** sent **${amount}** ${materialToSend.emoji} **${materialToSend.name}** to **${receiver.username}**!`
       );
       Promise.all([
-        deleteUserBagCache(sender.id),
-        deleteUserBagCache(receiver.id),
+        deleteCachedData(userBagKey),
+        // deleteUserBagCache(receiver.id),
       ])
         .then(() => {
           console.log(
