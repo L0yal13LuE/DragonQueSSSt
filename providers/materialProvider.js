@@ -55,7 +55,8 @@ const getMaterialByChannel = async (filters = {}, isall = false) => {
           is_active,
           rarity:rarities (
             name,     
-            drop_rate
+            drop_rate,
+            emoji
           )
         ),
         channel:channels (

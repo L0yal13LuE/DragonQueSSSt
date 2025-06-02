@@ -33,6 +33,7 @@ const handleItemDropV2 = async (message, channel) => {
       emoji: item.material.emoji,
       rarity: item.material.rarity.name,
       dropRate: item.material.rarity.drop_rate,
+      rarityEmoji: item.material.rarity.emoji,
     };
 
     itemList.push(obj); // Add object to array
@@ -86,9 +87,10 @@ const handleItemDropV2 = async (message, channel) => {
         title: "✨ Found Item! ✨",
         description: `${message.author.toString()} got the item!`,
       }).addFields(
+        { name: "Rarity", value: `${selectedItem.rarityEmoji}`, inline: true },
         {
           name: "Item",
-          value: `${selectedItem.emoji} ${selectedItem.name}`,
+          value: `${selectedItem.name} ${selectedItem.emoji}`,
           inline: true,
         },
         { name: "Amount", value: itemAmount.toString(), inline: true },
