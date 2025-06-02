@@ -29,12 +29,12 @@ const handleCraftCommand = async (message, args) => {
             // Add the item as a field to the embed
             if (item.materials.length != 0) {
                 let itemLetter = lettesArray[index];
-                const materialRowArray = item.materials.map(row => `${row.materials.emoji} ${row.materials.name} x ${row.amount}`);
+                const materialRowArray = item.materials.map(row => `${(row.materials.emoji.indexOf('?') > -1) ? '⚪️' : row.materials.emoji} ${row.materials.name} x ${row.amount}`);
                 // main row
                 const mainrow = {
-                    name: `:regional_indicator_${itemLetter.toLowerCase()}: — ${item.emoji} ${item.name}`,
+                    name: `:regional_indicator_${itemLetter.toLowerCase()}: — ${item.emoji.indexOf('?') > -1 ? '⚪️' : item.emoji} ${item.name}`,
                     value: `Required: ${materialRowArray.join(", ")}`,
-                    inline: false 
+                    inline: false
                 };
                 baseEmbed.addFields(mainrow);
             }

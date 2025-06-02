@@ -14,8 +14,8 @@ const shopSettings = async (channelId, client) => {
         // define default value
         let title = 'Master Shiro\'s Shop';
         let description = 'Welcome, See what wares I have for sale';
-        let thumbnail = '<URL>';
-        let image = '<URL>';
+        let thumbnail = null;
+        let image = null;
         let footer = 'Hope you like it!';
         let itemsForSellMaster = [];
 
@@ -327,8 +327,8 @@ const clanShopSetting = async (channelId, clanNumber) => {
         // define default value
         let title = 'Master Shiro\'s Shop';
         let description = 'Welcome, See what wares I have for sale';
-        let thumbnail = '<URL>';
-        let image = '<URL>';
+        let thumbnail = null;
+        let image = null;
         let footer = 'Hope you like it!';
         let itemsForSellMaster = [];
 

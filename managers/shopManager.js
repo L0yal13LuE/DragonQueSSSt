@@ -30,14 +30,13 @@ const buildRowComponents = async (message, args, refreshItem) => {
     const itemsInSelectMenu = [];
     args.items.forEach((item, index) => {
         const amountSuffix = (item.amount > 1) ? `(x${item.amount.toLocaleString()})` : '';
-        const itemValue = `${item.materials.id}-${item.amount}-${item.materials.emoji}-${item.materials.name}/${item.material_use_id}-${item.price}-${item.currency}`;
+        const itemValue = `${item.materials.id}-${item.amount}-${(item.materials.emoji.indexOf('?') > -1)?'⚪️':item.materials.emoji}-${item.materials.name}/${item.material_use_id}-${item.price}-${item.currency}`;
         //const itemDesc = `${item.price.toLocaleString()} ${item.currency} (Owned: ${item.owned.toLocaleString()})`;
         const itemDesc = `${item.price.toLocaleString()} ${item.currency}`;
         itemsInSelectMenu[index] = new StringSelectMenuOptionBuilder()
             .setLabel(`${item.materials.name} ${amountSuffix}`)
             .setDescription(itemDesc)
-            .setValue(itemValue)
-            .setEmoji(item.materials.emoji);
+            .setValue(itemValue);
     });
 
     // const clearAmouunt = new StringSelectMenuOptionBuilder()
@@ -93,13 +92,14 @@ const handleShopCommand = async (message, args) => {
         }
 
         // --- 1. Create Embed text ---
-        const baseEmbed = createBaseEmbed({
+        const embedObj = {
             color: '#0099ff',
             title: args.title,
             description: `${args.description}\n\nYou can retry if purchase failed.\nExpire in ${autoClose} minute. ${expirationTimestamp}\n*please make purchase 30 seconds before closing*`,
-            thumbnail: args.thumbnail,
+            thumbnail: args.thumbnail||null,
             footer: { 'text': args.footer },
-        });
+        };
+        const baseEmbed = createBaseEmbed(embedObj);
 
         // --- 2. Create Embed with Items ---
         // --- 3. Add items as fields to the embed using the new parameters

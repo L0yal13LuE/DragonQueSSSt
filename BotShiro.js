@@ -267,25 +267,17 @@ client.on('messageCreate', async (message) => {
             //     handleLeaderboardCommand(message, client);
             //     break;
             case 'shop':
-                if (shopWorkShopSettings) {
-                    shopWorkShopSettings = await handleShopCommand(message, shopWorkShopSettings);
-                }
-                break;
-            case 'shop_clan':
-            case 'shop-clan':
-            case 'shopclan':
                 // check if message channel id matching clan shop settiings channel ids
                 if (clanShopSettingData.has(message.channel.id)) {
                     const shopClanInitData = clanShopSettingData.get(message.channel.id);
                     if (shopClanInitData && shopClanInitData.items.length > 0) {
                         await handleShopCommand(message, shopClanInitData);
-                    } else {
-                        message.reply("No Items sell in this Clan Shop, comeback later.");
                         return;
-                    }
-                } else {
-                    message.reply("No Items sell in this Clan Shop, comeback later.");
-                    return;
+                    } 
+                }
+                // somehow shop clan command is not valid -> try normal shop command
+                if (shopWorkShopSettings) {
+                    await handleShopCommand(message, shopWorkShopSettings);
                 }
                 break;
             case 'craft':

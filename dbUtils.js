@@ -358,7 +358,7 @@ const getShopItems = async (shopId) => {
         }
         
         if (!shopItems || shopItems.length === 0) {
-            console.log(`No items found for shop ${shopId}`);
+            // console.log(`No items found for shop ${shopId}`);
         }
         
         return shopItems;
