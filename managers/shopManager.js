@@ -106,14 +106,14 @@ const handleShopCommand = async (message, args) => {
         const rows = await buildRowComponents(message, args, true);
 
         // --- 4. Send the embed with the select menus ---
-        let reply = await message.reply({
+        const reply = await message.reply({
             embeds: [baseEmbed],
             components: rows,
         });
 
 
         // --- 5. Delete the message after 1 minute ---
-        let instanceTimeout = setTimeout(async () => {
+        const instanceTimeout = setTimeout(async () => {
             try {
                 if (instanceTimeout) clearTimeout(instanceTimeout);
                 await reply.delete();
@@ -123,11 +123,15 @@ const handleShopCommand = async (message, args) => {
             }
         }, autoCloseTimer);
 
-        args.instance.set(userId, reply);
-        args.instanceTimeout.set(userId, instanceTimeout);
+        try {
+            args.instance.set(userId, reply);
+            args.instanceTimeout.set(userId, instanceTimeout);
 
-        // args.instance[userId] = reply
-        // args.instanceTimeout[userId] = instanceTimeout;
+            console.log(`[${message.author.username}] Shop opened.`, args.instance.get(userId));
+        } catch (errorSet) {
+            console.error('Error setting instance:', errorSet);
+        }
+
         return args;
     } catch (error) {
         console.error('Error sending shop embed with buttons:', error);
@@ -171,22 +175,7 @@ const handleShopSelectMenuClick = async (interaction, args) => {
         // Process purchase
         await processPurchase(interaction, itemDetails);
 
-        // for testing done
-        // await interaction.channel.send('Purchase successful!');
-
-        // if (args.instance && args.instance[userId]) {
-        //     await args.instance[userId].delete();
-        //     args.instance[userId] = null;
-        // } else {
-        //     console.log('args.instance : not found', args);
-        // }
-        // if (args.instanceTimeout && args.instanceTimeout[userId]) {
-        //     clearTimeout(args.instanceTimeout[userId]);
-        //     args.instanceTimeout[userId] = null;
-        // } else {
-        //     console.log('args.instanceTimeout : not found', args);
-        // }
-
+        // Delete embedpost after purchase
         const shopMessage = args.instance.get(userId);
         if (shopMessage) {
             try {
@@ -194,13 +183,13 @@ const handleShopSelectMenuClick = async (interaction, args) => {
             } catch (errorDel) {
                 if (errorDel.code !== 10008) console.error('Error deleting main shop message after purchase:', errorDel);
             }
-            args.instance.delete(userId); // Remove from Map
+            args.instance.delete(userId);
         }
         if (args.instanceTimeout.has(userId)) {
             clearTimeout(args.instanceTimeout.get(userId));
-            args.instanceTimeout.delete(userId); // Remove from Map
-        }
-        return true; // Indicate successful handling, collector will stop
+            args.instanceTimeout.delete(userId);
+        } 
+        return true;
     } catch (error) {
         console.error('Shop purchase error:', error);
         await handlePurchaseError(interaction, error);

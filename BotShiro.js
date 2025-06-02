@@ -29,7 +29,7 @@ const { handleCraftCommand, handleCraftButtonClick, clanCraftChannels } = requir
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
 // const { handleSendCommand } = require('./slashCommandHandler.js');
 const { handleSendCommand } = require('./slashCommandHandler.js');
-const { handleBagCommand, handleBagPaginationInteraction} = require('./managers/bagPaginationManager.js');
+const { handleBagCommand, handleBagPaginationInteraction } = require('./managers/bagPaginationManager.js');
 const { fetchRarity } = require('./managers/rarityManager.js');
 const { resetCachedDataOnStartUp } = require('./managers/cacheManager.js');
 
@@ -273,7 +273,7 @@ client.on('messageCreate', async (message) => {
                     if (shopClanInitData && shopClanInitData.items.length > 0) {
                         await handleShopCommand(message, shopClanInitData);
                         return;
-                    } 
+                    }
                 }
                 // somehow shop clan command is not valid -> try normal shop command
                 if (shopWorkShopSettings) {
@@ -362,6 +362,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
     try {
         if (interaction.customId) console.error("Events.InteractionCreate : start!", interaction.customId);
         if (interaction.isStringSelectMenu() && interaction.customId.startsWith("shop_base") && shopWorkShopSettings) {
+            // check if button is in clan shop
+            if (clanShopSettingData && clanShopSettingData.has(interaction.channelId)) {
+                const shopClanInitData = clanShopSettingData.get(interaction.channelId);
+                if (shopClanInitData && shopClanInitData.items.length > 0) {
+                    await handleShopSelectMenuClick(interaction, shopClanInitData);
+                    return;
+                }
+            }
+            // button is not in clan shop
             await handleShopSelectMenuClick(interaction, shopWorkShopSettings);
             return;
         }
