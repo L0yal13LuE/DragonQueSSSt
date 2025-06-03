@@ -1,6 +1,6 @@
 const { supabase } = require("../supabaseClient");
+const { fetchOrGetMaterialChannel } = require("./materialManager");
 const {
-  getMaterialByChannel,
   getUserItem,
   insertUserItem,
   updateUserItem,
@@ -12,12 +12,12 @@ let baseDropRate = 0.15;
 const handleItemDropV2 = async (message, channel) => {
   const channelId = message.channel.id;
   if (!supabase) {
-    console.warn("[ItemDropV2] Supabase client not available.");
+    console.warn("[ItemDrop] Supabase client not available.");
     return [];
   }
 
   // 1. Determine Item List and Area Type
-  const materialData = await getMaterialByChannel({
+  const materialData = await fetchOrGetMaterialChannel({
     channelId: message.channel.id,
   });
 
@@ -94,7 +94,7 @@ const handleItemDropV2 = async (message, channel) => {
           inline: true,
         },
         { name: "Amount", value: itemAmount.toString(), inline: true },
-        { name: "Location", value: `<#${channelId}>`, inline: true }
+        { name: "From", value: `<#${channelId}>`, inline: true }
       );
 
       channel.send({ embeds: [itemDropEmbed] });
@@ -123,12 +123,10 @@ const insertDropItems = async (message, selectedItem, itemAmount = 1) => {
 
     let itemInserted = false;
     if (userItem && userItem.length > 0) {
-      const oldAmount = userItem[0].amount;
       const newAmount = userItem[0].amount + itemAmount;
       itemInserted = await updateUserItem(
         message.author,
         userItem[0],
-        oldAmount,
         newAmount
       );
     } else {

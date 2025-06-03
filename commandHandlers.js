@@ -11,10 +11,8 @@ const {
   getTotalDamageDealt,
 } = require("./dbUtils");
 const { calculateNextLevelExp, getTodaysDateString } = require("./gameLogic");
-const { getUserItem, getUserItemV2 } = require("./providers/materialProvider");
+const { getUserItem } = require("./providers/materialProvider");
 const { createBagEmbed } = require("./managers/embedManager");
-const { getCachedData } = require("./managers/cacheManager");
-const CONSTANTS = require("./constants");
 
 /**
  * Handles the '!rank' command with a fancier embed and progress bar. Works in any channel.
@@ -118,20 +116,6 @@ const handleBagCommand = async (message) => {
       userId: message.author.id,
       amount: 1,
     });
-
-    // Fetch rarities from cache
-    // raritiesArray should be an array of { id, name, emoji, drop_rate, ... }
-    const raritiesArray = await getCachedData(CONSTANTS.CACHE_RARITIES_PREFIX);
-
-    // Create a map for efficient lookup of rarities by id
-    const raritiesMap = new Map();
-    if (Array.isArray(raritiesArray)) {
-      raritiesArray.forEach((rarity) => raritiesMap.set(rarity.id, rarity));
-    } else {
-      console.warn(
-        `[handleBagCommand] ${CONSTANTS.CACHE_RARITIES_PREFIX} data from cache is not an array or is null. Rarity info might be missing.`
-      );
-    }
 
     const itemList =
       userItems && userItems.length > 0
@@ -237,15 +221,15 @@ const handleBagPaginationCommand = async (message, isDM = false) => {
     const userId = message.author.id;
     const username = message.author.username;
 
-    const userItems = await getUserItemV2({
+    const userItems = await getUserItem({
       userId: userId,
       amount: 1,
     });
 
     if (isDM) {
       const itemList =
-        userItems.count > 0
-          ? Object.values(userItems.data)
+        userItems && userItems.length > 0
+          ? Object.values(userItems)
               .map(
                 (value) =>
                   `${value.material.rarities.emoji} ${value.material.name} ${value.material.emoji} x ${value.amount}`

@@ -13,6 +13,7 @@ const { getChannel } = require('./providers/channelProvider');
 const { handleItemDropV2 } = require('./managers/itemManager.js');
 const { createDamageEmbed } = require('./managers/embedManager');
 const { getMonsters } = require('./providers/monsterProvider');
+const { fetchOrGetChannel } = require('./managers/channelManager.js');
 
 /**
  * Gets the current UTC date as a string 'YYYY-MM-DD'.
@@ -69,46 +70,6 @@ const spawnNewMonster = async (dateString) => {
 };
 
 /**
- * Handles item drop logic based on channel configuration.
- */
-const handleItemDrop = async (userId, channelId, message, announcementChannel) => {
-    // manual fixed drop rate on every channel
-    // const dropConfig = { dropRate: 0.33, dropItems: MATERIAL_LIST };
-    // if (!dropConfig) return;
-
-    //const randomChance = Math.random();
-    //if (randomChance < dropConfig.dropRate) {
-    //    const possibleItems = dropConfig.dropItems;
-    //    if (!possibleItems || possibleItems.length === 0) return;
-
-    const randomItemArray = handleDropByLocation(channelId);
-    // console.log('handleItemDrop > randomItemArray', randomItemArray);
-    if (randomItemArray.length > 0) {
-        const randomItem = randomItemArray[0];
-        // console.log('handleItemDrop > randomItem', randomItem);
-        // const randomItem = possibleItems[Math.floor(Math.random() * possibleItems.length)];
-        const itemAmount = 1;
-        const itemInserted = await insertUserItem(userId, channelId, randomItem, itemAmount, new Date().toISOString());
-
-        if (itemInserted && announcementChannel) {
-            console.log(`[${message.author.username}] Sending item drop announcement.`);
-            const itemDropEmbed = new EmbedBuilder()
-                .setColor(0xFFD700).setTitle('✨ Found Item! ✨')
-                .setDescription(`${message.author.toString()} got the item!`)
-                .addFields(
-                    { name: 'Item', value: `${randomItem.emoji} ${randomItem.name}`, inline: true },
-                    { name: 'Amount', value: itemAmount.toString(), inline: true },
-                    { name: 'Location', value: `<#${channelId}>`, inline: true }
-                ).setTimestamp();
-            announcementChannel.send({ embeds: [itemDropEmbed] });
-        } else if (itemInserted) {
-            console.warn(`[${message.author.username}] Earned item, but announcement channel unavailable for announcement.`);
-        }
-    }
-    //}
-};
-
-/**
  * Checks total damage against max HP and updates monster status if defeated.
  * Returns true if the monster was defeated *by this check*, false otherwise.
  */
@@ -158,7 +119,7 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
 
     console.log(`[${username}]--->${message.content}<---`);
 
-    const allowedChannelData = await getChannel({isGainExp: true});
+    const allowedChannelData = await fetchOrGetChannel({isGainExp: true});
     const isChannelAllowed = allowedChannelData && allowedChannelData.some(channel => channel.id === message.channel.id);
 
     if (message.author.bot || !supabase || !isChannelAllowed) return;
@@ -239,7 +200,6 @@ const handleExpGain = async (message, userCooldowns, announcementChannel, itemDr
                 console.error(`[${username}] Leveled up but failed DB update.`);
             }
 
-            // await handleItemDrop(userId, message.channel.id, message, itemDropChannel);
             await handleItemDropV2(message, itemDropChannel);
 
         } else {
@@ -403,7 +363,6 @@ const cleanDiscordMessage = (messageContent) => {
 module.exports = {
     calculateNextLevelExp,
     processUserExp,
-    handleItemDrop,
     checkAndProcessMonsterDefeat,
     handleExpGain,
     hourlyMonsterCheck,

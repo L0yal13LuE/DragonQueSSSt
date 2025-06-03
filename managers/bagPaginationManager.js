@@ -73,7 +73,7 @@ const handleBagCommand = async (message, isDM = false) => {
     const autoCloseMs = BAG_AUTO_CLOSE_MINUTES * 60 * 1000;
 
     try {
-        const userItems = await getUserItem({ userId: userId });
+        const userItems = await getUserItem({ userId: userId, amount: 1 });
 
         if (!userItems || userItems.length === 0) {
             const emptyBagMessage = "Your bag is empty... Go find some items!";

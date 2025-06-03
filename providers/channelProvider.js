@@ -3,7 +3,7 @@ const { supabase } = require('../supabaseClient');
 const getChannel = async (filters = {}) => {
   try {
     if (!supabase) { console.error("Supabase client not available in getChannel"); return null; }
-    let query = supabase.from("channels").select(`id, name`);
+    let query = supabase.from("channels").select(`id, name, is_active`);
 
     if ("channelId" in filters) {
       query = query.eq("id", filters.channelId);
