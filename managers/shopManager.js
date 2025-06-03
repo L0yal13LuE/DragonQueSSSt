@@ -126,8 +126,6 @@ const handleShopCommand = async (message, args) => {
         try {
             args.instance.set(userId, reply);
             args.instanceTimeout.set(userId, instanceTimeout);
-
-            console.log(`[${message.author.username}] Shop opened.`, args.instance.get(userId));
         } catch (errorSet) {
             console.error('Error setting instance:', errorSet);
         }

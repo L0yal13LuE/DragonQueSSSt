@@ -383,6 +383,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await handleCraftButtonClick(interaction, craftWorkShopSettings);
             return;
         }
+        if (interaction.isButton() && interaction.customId.startsWith("craftclan_")) {
+            const craftInClan = clanCraftSettingData.find(row => row.channel_id == interaction.channelId);
+            if (craftInClan && craftInClan.setting && craftInClan.setting.items.length > 0) {
+                console.log("[CraftClan] Click Button : ", interaction.customId);
+                await handleCraftButtonClick(interaction, craftInClan.setting);
+                return;
+            }
+            return;
+        }
         if (interaction.commandName === "send") {
             await handleSendCommand(interaction);
             return;

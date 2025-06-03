@@ -11,6 +11,7 @@ const handleCraftCommand = async (message, args) => {
     try {
 
         const userId = message.author.id;
+        const clanNumber = Number(args.clanNumber) || 0; // requried to separate normal craft and clan craft
 
         const autoClose = 5;
         const autoCloseTimer = (autoClose * 60) * 1000;
@@ -49,12 +50,13 @@ const handleCraftCommand = async (message, args) => {
         // --- 3. Create Buttons for each item ---
         let rows = [];
         let currentRow = new ActionRowBuilder();
+        let buttonPrefix = 'craft_'; // default prefix for normal craft
+        if (clanNumber && clanNumber > 0) buttonPrefix = 'craftclan_'; // prefix for clan craft
         args.items.forEach((item, index) => {
             if (item.materials.length != 0) {
-                // const uniqueItemId = `${item.name}`;
                 let itemLetter = lettesArray[index];
                 let button = new ButtonBuilder()
-                    .setCustomId(`craft_${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}_${userId}`)
+                    .setCustomId(`${buttonPrefix}${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}_${userId}`)
                     .setLabel(itemLetter) // Button text
                     .setStyle(ButtonStyle.Primary); // Use a primary button style
 
@@ -74,12 +76,12 @@ const handleCraftCommand = async (message, args) => {
         // --- 4. Send Embed with Buttons ---
         let reply = await message.reply({
             embeds: [baseEmbed],
-            components: rows, // Attach the action rows containing the buttons
+            components: rows,
         });
 
         // --- 5. Delete the message after 5 minute ---
-        let openCrafTimer = setTimeout(async () => {
-            clearTimeout(openCrafTimer);
+        let instanceTimeout = setTimeout(async () => {
+            clearTimeout(instanceTimeout);
             try {
                 await reply.delete();
             } catch (errorDel) {
@@ -101,14 +103,18 @@ const handleCraftButtonClick = async (interaction, args) => {
     const userId = interaction.user.id;
     const username = interaction.user.username;
 
-    // Check if the button custom ID starts with 'craft_', indicating a shop purchase attempt
-    if (interaction.customId.startsWith('craft_')) {
+    let buttonPrefix = 'craft_'; // default prefix for normal craft
+    const clanNumber = Number(args.clanNumber) || 0;
+    if (clanNumber && clanNumber > 0) buttonPrefix = 'craftclan_';
+
+    // Check if the button custom ID starts with `buttonPrefix`, indicating a shop purchase attempt
+    if (interaction.customId.startsWith(buttonPrefix)) {
 
         // Defer the reply to prevent interaction timeout, reply is only visible to the user
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         // Extract the item 
-        const itemToBuyNameA = interaction.customId.replace('craft_', '').replace(/_/g, '');
+        const itemToBuyNameA = interaction.customId.replace(buttonPrefix, '').replace(/_/g, '');
         const itemToBuyName = itemToBuyNameA.split('@')[0];
         const itemToCraft = args.items.find(item => item.letter === itemToBuyName);
 
@@ -170,8 +176,6 @@ const handleCraftButtonClick = async (interaction, args) => {
         const isValid = resultPrepareItem.every(item => item.valid);
         if (isValid) {
 
-            // console.log("resultPrepareItem: ", resultPrepareItem);
-
             // update item
             let allUpdated = true, allUpdateResult = [];
             await Promise.all(resultPrepareItem.map(async ({ amount_owned, amount_new, userItemMatch }) => {
@@ -215,7 +219,12 @@ const handleCraftButtonClick = async (interaction, args) => {
             }
             //await interaction.editReply(`This feature coming soon! (crafting ${itemToCraft.emoji} ${itemToCraft.name})\nStay tuned! for upcoming features!🤗`);
         } else {
+            // not enough material
+            // show what they don't have
+            const invalidMaterials = resultPrepareItem.filter(item => !item.valid);
+            const missingMaterials = invalidMaterials.map(item => `> ${item.name} (**${item.amount_owned}**/${item.amount})`).join('\n');
             await interaction.editReply(`Fail: You don't have enough material to craft **${itemToCraft.emoji} ${itemToCraft.name}**.`);
+            await interaction.followUp(`Missing: \n${missingMaterials}\nComeback again when you have the required materials!`);
         }
     }
 }
