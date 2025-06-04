@@ -1,16 +1,42 @@
-const { supabase } = require("../supabaseClient");
+const CONSTANTS = require("../constants");
+const { fetchWithCache } = require("./cacheManager");
+
 const {
   getMaterialByChannel,
-  getUserItemV2,
+  getUserItem,
   insertUserItem, // Added import for insertUserItem
-  updateUserItemV2,
+  updateUserItem,
 } = require("../providers/materialProvider");
 const { createBaseEmbed } = require("../managers/embedManager");
 
-/**
- * Handles the '!spin' command to fetch and display a random card.
- * @param {object} message - The Discord message object.
- */
+const fetchOrGetMaterialChannel = async (filters = {}) => {
+  const result = await fetchWithCache({
+    cacheKey: CONSTANTS.CACHE_MATERIAL_CHANNEL_PREFIX,
+    ttl: CONSTANTS.CACHE_MATERIAL_CHANNEL_TTL_MS,
+    providerFn: getMaterialByChannel,
+    label: "fetchMaterialChannel",
+    filters,
+  });
+
+  if (!result) {
+    return result; // either false or an object with invalid data
+  }
+
+  let filteredData = result;
+
+  if ("channelId" in filters) {
+    filteredData = filteredData.filter((item) => item.channel_id === filters.channelId);
+  }
+
+  if ("isGainExp" in filters) {
+    filteredData = filteredData.filter(
+      (item) => item.is_active === filters.isGainExp
+    );
+  }
+
+  return filteredData;
+};
+
 const handleMaterialCommand = async (message) => {
   try {
     const channelId = message.channelId;
@@ -55,15 +81,15 @@ const handleMaterialCommand = async (message) => {
 
 const deductItemFromUser = async (user, itemId, deductedAmount) => {
   try {
-    const userItems = await getUserItemV2({
+    const userItems = await getUserItem({
       userId: user.id,
       itemId: itemId,
     });
 
     if (
       !userItems ||
-      userItems.count === 0 ||
-      userItems.data[0].amount < deductedAmount
+      userItems.length === 0 ||
+      userItems[0].amount < deductedAmount
     ) {
       console.error(
         `[Item Deduction Error] User: ${user.id} | Item ID: ${itemId} | Amount: ${deductedAmount}. Not enough items or item not found.`
@@ -71,10 +97,10 @@ const deductItemFromUser = async (user, itemId, deductedAmount) => {
       return false;
     }
 
-    const updateSuccess = await updateUserItemV2(
+    const updateSuccess = await updateUserItem(
       user,
-      userItems.data[0],
-      userItems.data[0].amount - deductedAmount
+      userItems[0],
+      userItems[0].amount - deductedAmount
     );
     return updateSuccess;
   } catch (error) {
@@ -85,12 +111,12 @@ const deductItemFromUser = async (user, itemId, deductedAmount) => {
 
 const addItemtoUser = async (user, materialObject, addedAmount) => {
   try {
-    const userItems = await getUserItemV2({
+    const userItems = await getUserItem({
       userId: user.id,
       itemId: materialObject.id,
     });
 
-    if (!userItems || userItems.count === 0) {
+    if (!userItems || userItems.length === 0) {
       // User doesn't have this item yet, insert new record
       const insertSuccess = await insertUserItem(
         user,
@@ -109,8 +135,8 @@ const addItemtoUser = async (user, materialObject, addedAmount) => {
       return true;
     } else {
       // User already has this item, update existing record
-      const currentItemInstance = userItems.data[0];
-      const updateSuccess = await updateUserItemV2(
+      const currentItemInstance = userItems[0];
+      const updateSuccess = await updateUserItem(
         user,
         currentItemInstance,
         currentItemInstance.amount + addedAmount
@@ -128,6 +154,7 @@ const addItemtoUser = async (user, materialObject, addedAmount) => {
 
 // Export the function to be used in other files
 module.exports = {
+  fetchOrGetMaterialChannel,
   handleMaterialCommand,
   deductItemFromUser,
   addItemtoUser,

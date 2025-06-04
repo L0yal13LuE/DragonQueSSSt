@@ -24,7 +24,7 @@ const getRarity = async (filters = {}) => {
       return null;
     }
 
-    return { data, count, error: null };
+    return data;
   } catch (error) {
     console.error("Function error:", error);
     return null;

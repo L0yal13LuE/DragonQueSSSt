@@ -29,14 +29,17 @@ const handleLevelUpAnnouncement = (message, newLevel, currentExp, announcementCh
     const { calculateNextLevelExp } = require('./gameLogic'); // Lazy require to avoid circular dependency if needed, or pass value
 
     const levelUpEmbed = new EmbedBuilder()
-        .setColor(0x00FF00).setTitle('🎉 เลเวลอัพ! 🎉')
-        .setDescription(`${message.author.toString()} อัพเลเวลแล้ว! เก่งมั่กๆ 👍`)
+        .setColor(0x00FF00)
+        .setTitle('🎉 Level Up! 🎉')
+        .setDescription(`${message.author.toString()} just leveled up! Great job 👍`)
         .addFields(
-            { name: 'เลเวลใหม่', value: newLevel.toString(), inline: true },
-            { name: 'EXP ปัจจุบัน', value: currentExp.toString(), inline: true },
-            { name: 'EXP เวลถัดไป', value: calculateNextLevelExp(newLevel).toString(), inline: true }
+            { name: 'New Level', value: newLevel.toString(), inline: true },
+            { name: 'Current EXP', value: currentExp.toString(), inline: true },
+            { name: 'EXP for Next Level', value: calculateNextLevelExp(newLevel).toString(), inline: true }
         )
-        .setThumbnail(message.author.displayAvatarURL()).setTimestamp();
+        .setThumbnail(message.author.displayAvatarURL())
+        .setTimestamp();
+
     try {
         announcementChannel.send({ embeds: [levelUpEmbed] });
         console.log(`[${message.author.username}] Sent level up announcement.`);
@@ -45,55 +48,81 @@ const handleLevelUpAnnouncement = (message, newLevel, currentExp, announcementCh
     }
 };
 
+
 /**
  * Announces that a new monster has spawned in the announcement channel.
  */
 const announceMonsterSpawn = (announcementChannel, monsterData) => {
     if (!announcementChannel || !monsterData) {
-        console.warn("Cannot announce monster spawn: Channel or monster data missing."); return;
+        console.warn("Cannot announce monster spawn: Channel or monster data missing.");
+        return;
     }
+
     const spawnEmbed = new EmbedBuilder()
-        .setColor(0xFF4500).setTitle(`💥 มอนสเตอร์บุก! ${monsterData.name} ปรากฏตัว! 💥`)
-        .setDescription(`เจ้า **${monsterData.name}** โผล่มาแล้ว! โจมตีมันด้วยการแชทเก็บ EXP ในช่องไหนก็ได้!\nEXP ของทุกคนคือดาเมจใส่บอส! 🔥`)
+        .setColor(0xFF4500)
+        .setTitle(`💥 Monster Invasion! ${monsterData.name} Has Appeared! 💥`)
+        .setDescription(`**${monsterData.name}** has appeared! Attack it by chatting in any channel to earn EXP!\nEveryone’s EXP counts as damage to the boss! 🔥`)
         .addFields(
-            { name: 'พลังชีวิตทั้งหมด (HP)', value: `**${monsterData.max_hp}**`, inline: true },
-            { name: 'วันที่ปรากฏตัว', value: monsterData.spawn_date, inline: true }
-        ).setTimestamp();
+            { name: 'Total HP', value: `**${monsterData.max_hp}**`, inline: true },
+            { name: 'Spawn Date', value: monsterData.spawn_date, inline: true }
+        )
+        .setTimestamp();
+
     try {
-        announcementChannel.send({ content: "@everyone ภารกิจท้าทายรายวันมาแล้ว!", embeds: [spawnEmbed] });
+        announcementChannel.send({
+            content: "<@&1378563196763242557> The daily challenge mission has begun!",
+            embeds: [spawnEmbed]
+        });
         console.log(`Announced spawn of ${monsterData.name}`);
     } catch (error) {
         console.error(`Error sending monster spawn announcement for ${monsterData.name}:`, error);
     }
 };
-
 /**
  * Announces monster defeat in the announcement channel, marks reward announced in DB, and deletes hits.
  */
 const announceMonsterDefeat = async (announcementChannel, monsterData) => {
     if (!announcementChannel || !monsterData) {
-        console.warn("Cannot announce monster defeat: Channel or monster data missing."); return;
+        console.warn("Cannot announce monster defeat: Channel or monster data missing.");
+        return;
     }
-    if (!supabase) { console.warn("Cannot announce monster defeat: Supabase client missing."); return; }
-    const killerUser = monsterData.killed_by_user_id ? `<@${monsterData.killed_by_user_id}>` : "เหล่านักผจญภัย";
+    if (!supabase) {
+        console.warn("Cannot announce monster defeat: Supabase client missing.");
+        return;
+    }
+
+    const killerUser = monsterData.killed_by_user_id ? `<@${monsterData.killed_by_user_id}>` : "the adventurers";
     const defeatEmbed = new EmbedBuilder()
-        .setColor(0x32CD32).setTitle(`🎉 ชัยชนะ! ปราบ ${monsterData.name} สำเร็จ! 🎉`)
-        .setDescription(`โค่น **${monsterData.name}** ได้แล้ว! ยินดีกับ **${killerUser}** ที่ปิดจ๊อบสุดท้าย! 🏆`)
+        .setColor(0x32CD32)
+        .setTitle(`🎉 Victory! ${monsterData.name} Has Been Defeated! 🎉`)
+        .setDescription(`**${monsterData.name}** has been defeated! Congrats to **${killerUser}** for landing the final blow! 🏆`)
         .addFields(
-            { name: 'ปราบวันที่', value: monsterData.spawn_date, inline: true },
-            { name: 'HP ทั้งหมด', value: monsterData.max_hp.toString(), inline: true }
+            { name: 'Defeated On', value: monsterData.spawn_date, inline: true },
+            { name: 'Total HP', value: monsterData.max_hp.toString(), inline: true }
         )
         .setTimestamp(monsterData.killed_at_timestamp ? new Date(monsterData.killed_at_timestamp) : new Date());
 
     if (monsterData.killed_by_user_id) {
-        defeatEmbed.addFields({ name: 'ปิดจ๊อบโดย', value: `<@${monsterData.killed_by_user_id}>`, inline: true });
+        defeatEmbed.addFields({
+            name: 'Final Blow By',
+            value: `<@${monsterData.killed_by_user_id}>`,
+            inline: true
+        });
     }
+
     if (monsterData.killed_at_timestamp) {
-        defeatEmbed.addFields({ name: 'เวลาที่ปราบ', value: `<t:${Math.floor(new Date(monsterData.killed_at_timestamp).getTime() / 1000)}:R>`, inline: true });
+        defeatEmbed.addFields({
+            name: 'Time Defeated',
+            value: `<t:${Math.floor(new Date(monsterData.killed_at_timestamp).getTime() / 1000)}:R>`,
+            inline: true
+        });
     }
 
     try {
-        await announcementChannel.send({ content: "@everyone กำจัดมอนสเตอร์ประจำวันสำเร็จ!", embeds: [defeatEmbed] });
+        await announcementChannel.send({
+            content: "<@&1378563196763242557> Daily monster defeated successfully!",
+            embeds: [defeatEmbed]
+        });
         console.log(`Announced defeat of ${monsterData.name}`);
         await markRewardAnnounced(monsterData.spawn_date);
         await deleteMonsterHits(monsterData.spawn_date); // Delete hits after successful announcement and marking

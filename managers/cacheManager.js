@@ -1,114 +1,78 @@
-const fs = require("fs");
-const path = require("path");
-const CONSTANTS = require('../constants');
+const CONSTANTS = require("../constants");
+const { getRarity } = require("../providers/rarityProvider");
+const { getChannel } = require("../providers/channelProvider");
+const { getMaterialByChannel } = require("../providers/materialProvider");
+const {
+  getCachedData,
+  saveCachedData,
+  deleteCachedData,
+} = require("../providers/cacheProvider");
 
-const CACHE_DIR = "./cache";
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Generates the file path for a given cache key.
- * @param {string} key - The unique key for the cache entry (e.g., "bag_userId", "shop_data").
- * @returns {string} The full file path for the cache file.
- */
-const getCacheFilePath = (key) => {
-  return path.join(CACHE_DIR, `${key}.json`);
-};
-
-/**
- * Retrieves cached data by key if it exists and is not expired.
- * @param {string} key - The unique key for the cache entry.
- * @returns {Promise<any|null>} The parsed JSON data or null if not found or expired.
- */
-const getCachedData = async (key) => {
-  const filePath = getCacheFilePath(key);
-
-  if (!fs.existsSync(filePath)) return null;
-
+const fetchWithCache = async ({
+  cacheKey,
+  ttl,
+  providerFn,
+  label = "fetchWithCache",
+  filters = {},
+}) => {
   try {
-    const raw = fs.readFileSync(filePath, "utf-8");
-    const cacheEntry = JSON.parse(raw); // Expects { data: ..., expiresAt: ... }
+    const cachedResult = await getCachedData(cacheKey);
 
-    // Validate format and expiry
-    if (
-      cacheEntry &&
-      typeof cacheEntry === "object" &&
-      "expiresAt" in cacheEntry &&
-      "data" in cacheEntry
-    ) {
-      if (Date.now() > cacheEntry.expiresAt) {
-        fs.unlinkSync(filePath); // Delete expired cache file
-        console.log(`[Cache] Expired cache deleted for key: ${key}`);
-        return null;
-      }
-      return cacheEntry.data; // Return the actual data payload
-    } else {
-      // Invalid format, treat as corrupted/stale
-      console.log(`[Cache] Invalid cache format for key: ${key}. Deleting.`);
-      fs.unlinkSync(filePath);
-      return null;
+    if (cachedResult) {
+      return cachedResult;
     }
+
+    const result = await providerFn();
+
+    if (!result) {
+      return false;
+    }
+
+    saveCachedData(cacheKey, result, ttl);
+
+    return result;
   } catch (error) {
-    console.error(
-      `[Cache] Error reading or parsing cache for key ${key}:`,
-      error
-    );
-    // Attempt to delete corrupted cache file
-    if (fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-        console.log(`[Cache] Corrupted cache file deleted for key: ${key}`);
-      } catch (deleteError) {
-        console.error(
-          `[Cache] Error deleting corrupted cache file for key ${key}:`,
-          deleteError
-        );
-      }
-    }
-    return null;
+    console.error(`Unexpected error in ${label}:`, error);
+    return { data: null, count: 0, error };
   }
 };
 
-/**
- * Saves data to the cache with a given key.
- * @param {string} key - The unique key for the cache entry.
- * @param {any} data - The data to be cached (will be JSON.stringified).
- * @param {number} [ttlMs] - Optional Time-To-Live in milliseconds for this specific cache entry.
- */
-const saveCachedData = (key, data, ttlMs) => {
-  if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
-  }
-  const filePath = getCacheFilePath(key);
-  const effectiveTtl = ttlMs || CACHE_TTL_MS;
-  const cacheEntry = {
-    data: data,
-    expiresAt: Date.now() + effectiveTtl,
-  };
-  fs.writeFileSync(filePath, JSON.stringify(cacheEntry, null, 2));
-  console.log(`[Cache] Data saved for key: ${key}`);
-};
+const setCachedDataOnStartUp = async () => {
+  try {
+    await fetchWithCache({
+      cacheKey: CONSTANTS.CACHE_RARITIES_PREFIX,
+      ttl: CONSTANTS.CACHE_RARITIES_TTL,
+      providerFn: getRarity,
+      label: "fetchRarity",
+    });
 
-const deleteCachedData = async (key) => {
-  const filePath = getCacheFilePath(key);
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-    console.log(`[Cache] Deleted cache for key: ${key}`);
-    return true;
+    await fetchWithCache({
+      cacheKey: CONSTANTS.CACHE_CHANNEL_PREFIX,
+      ttl: CONSTANTS.CACHE_CHANNEL_TTL,
+      providerFn: getChannel,
+      label: "fetchChannel",
+    });
+
+    await fetchWithCache({
+      cacheKey: CONSTANTS.CACHE_MATERIAL_CHANNEL_PREFIX,
+      ttl: CONSTANTS.CACHE_MATERIAL_CHANNEL_TTL_MS,
+      providerFn: getMaterialByChannel,
+      label: "fetchMaterialChannel",
+    });
+  } catch (error) {
+    console.error(`Unexpected error in setting master data cache:`, error);
+    return { data: null, count: 0, error };
   }
-  return false;
 };
 
 const resetCachedDataOnStartUp = async () => {
   deleteCachedData(CONSTANTS.CACHE_RARITIES_PREFIX);
+  deleteCachedData(CONSTANTS.CACHE_CHANNEL_PREFIX);
+  deleteCachedData(CONSTANTS.CACHE_MATERIAL_CHANNEL_PREFIX);
 };
 
 module.exports = {
-  getCachedData,
-  saveCachedData,
-  // deleteCachedData will be the same as getCachedData but with unlinkSync
-  // For simplicity, if you need to delete, you can just let it expire or manually call fs.unlinkSync(getCacheFilePath(key))
-  // Or we can add a specific delete function:
-  deleteCachedData,
-  getCacheFilePath, // Exporting for potential direct use if needed
-  resetCachedDataOnStartUp
+  resetCachedDataOnStartUp,
+  setCachedDataOnStartUp,
+  fetchWithCache,
 };
