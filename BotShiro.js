@@ -1,3 +1,13 @@
+const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => res.send('Bot is alive!'));
+
+const port = 3000;
+app.listen(port, () => {
+  console.log(`Web server running on http://localhost:${port}`);
+});
+
 require('dotenv').config({
     path: {
         blue: '.env.blue',
@@ -37,6 +47,9 @@ const TOKEN = process.env.DISCORD_TOKEN;
 const ANNOUNCEMENT_CHANNEL_ID = process.env.ANNOUNCEMENT_CHANNEL_ID; // For level-ups ONLY
 const ITEM_DROP_CHANNEL_ID = process.env.ITEM_DROP_CHANNEL_ID; // For item-drop- ONLY
 const DAMAGE_LOG_CHANNEL_ID = process.env.DAMAGE_LOG_CHANNEL_ID; // For item-drop- ONLY
+
+app.get('/', (req, res) => res.send('Bot is alive!'));
+app.listen(3000, () => console.log('Web server running'));
 
 // --- Configuration Validation ---
 if (!TOKEN) {
