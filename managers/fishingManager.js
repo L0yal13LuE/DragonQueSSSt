@@ -7,39 +7,41 @@ const { createBaseEmbed } = require("./embedManager");
 const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/materialProvider");
 
 // handle when user run !craft command
-const handleCraftCommand = async (message, args) => {
+const fishingUserInstance = new Map();
+const handleFishingCommand = async (message) => {
     try {
 
         const userId = message.author.id;
-        const clanNumber = Number(args.clanNumber) || 0; // requried to separate normal craft and clan craft
 
-        const autoClose = 5;
+        const autoClose = 1;
         const autoCloseTimer = (autoClose * 60) * 1000;
         const expirationTimestamp = `<t:${Math.floor((Date.now() + autoClose * 60 * 1000) / 1000)}:R>`;
 
         // --- 1. Create Embed with Items ---
         const baseEmbed = createBaseEmbed({
-            color: '#0099ff',
-            title: args.title,
-            description: args.description,
+            color: 0x32cd32,
+            title: "🐟 Fishing 🐟",
+            description: "You are fishing in the ocean, and you catch some items!\nstarting form **Common** to **Super Rare**\nChoice is up to you!\n\n",
         });
 
         // ---- 2. Add items as fields to the embed using the new parameters
-        const lettesArray = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
-        args.items.forEach((item, index) => {
-            // Add the item as a field to the embed
-            if (item.materials.length != 0) {
-                let itemLetter = lettesArray[index];
-                const materialRowArray = item.materials.map(row => `${(row.materials.emoji.indexOf('?') > -1) ? '⚪️' : row.materials.emoji} ${row.materials.name} x ${row.amount}`);
-                // main row
-                const mainrow = {
-                    name: `:regional_indicator_${itemLetter.toLowerCase()}: — ${item.emoji.indexOf('?') > -1 ? '⚪️' : item.emoji} ${item.name}`,
-                    value: `Required: ${materialRowArray.join(", ")}`,
-                    inline: false
-                };
-                baseEmbed.addFields(mainrow);
+        baseEmbed.addFields(
+            {
+                name: `:regional_indicator_a: — 🎣 Common Fishing Rod (10 Como)`,
+                value: `Items: Common, Uncommon`,
+                inline: false
+            },
+            {
+                name: `:regional_indicator_b: — 🎣 Rare Fishing Rod (25 Como)`,
+                value: `Items: Uncommon, Rare`,
+                inline: false
+            },
+            {
+                name: `:regional_indicator_c: — 🎣 Rare Fishing Rod (50 Como)`,
+                value: `Items: Uncommon, Rare, Super Rare`,
+                inline: false
             }
-        });
+        );
 
         baseEmbed.addFields({
             name: ' ',
@@ -49,49 +51,46 @@ const handleCraftCommand = async (message, args) => {
 
         // --- 3. Create Buttons for each item ---
         let rows = [];
-        let currentRow = new ActionRowBuilder();
-        let buttonPrefix = 'craft_'; // default prefix for normal craft
-        if (clanNumber && clanNumber > 0) buttonPrefix = 'craftclan_'; // prefix for clan craft
-        args.items.forEach((item, index) => {
-            if (item.materials.length != 0) {
-                let itemLetter = lettesArray[index];
-                let button = new ButtonBuilder()
-                    .setCustomId(`${buttonPrefix}${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}_${userId}`)
-                    .setLabel(itemLetter) // Button text
-                    .setStyle(ButtonStyle.Primary); // Use a primary button style
-
-                // Add button to the current row
-                currentRow.addComponents(button);
-
-                // If the current row has 5 buttons or it's the last item, push the row and start a new one
-                if (currentRow.components.length === 5 || index === args.items.length - 1) {
-                    rows.push(currentRow);
-                    if (index < args.items.length - 1) { // Don't create a new row if it's the very last item
-                        currentRow = new ActionRowBuilder();
-                    }
-                }
-            }
-        });
+        const currentRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`fishing_a@${Math.floor(100000 + Math.random() * 900000)}_${userId}`)
+                .setLabel("A — 10 Como")
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`fishing_b@${Math.floor(100000 + Math.random() * 900000)}_${userId}`)
+                .setLabel("B — 25 Como")
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId(`fishing_c@${Math.floor(100000 + Math.random() * 900000)}_${userId}`)
+                .setLabel("C — 50 Como")
+                .setStyle(ButtonStyle.Primary)
+        );
+        rows.push(currentRow);
 
         // --- 4. Send Embed with Buttons ---
         let reply = await message.reply({
             embeds: [baseEmbed],
-            components: rows,
+            components: rows, // Attach the action rows containing the buttons
         });
 
         // --- 5. Delete the message after 5 minute ---
-        let instanceTimeout = setTimeout(async () => {
-            clearTimeout(instanceTimeout);
+        let timer = setTimeout(async () => {
             try {
-                await reply.delete();
+                if (fishingUserInstance.has(userId)) {
+                    const { replyInstance, timerInstance } = fishingUserInstance.get(userId);
+                    if (replyInstance) await replyInstance.delete();
+                    if (timerInstance) clearTimeout(timerInstance);
+                    fishingUserInstance.delete(userId);
+                }
             } catch (errorDel) {
                 console.error('Error deleting message:', errorDel);
             }
-            await message.reply('*Craft session closed.*');
+            await message.reply('*Fishing closed.*');
         }, autoCloseTimer);
+        fishingUserInstance.set(userId, { replyInstance: reply, timerInstance: timer });
     } catch (error) {
-        console.error('Error sending shop embed with buttons:', error);
-        message.reply('Could not display the shop at this time.');
+        console.error('Error Fishing embed with buttons:', error);
+        message.reply('Could not display Fishing at this time.');
     }
 }
 
@@ -103,18 +102,14 @@ const handleCraftButtonClick = async (interaction, args) => {
     const userId = interaction.user.id;
     const username = interaction.user.username;
 
-    let buttonPrefix = 'craft_'; // default prefix for normal craft
-    const clanNumber = Number(args.clanNumber) || 0;
-    if (clanNumber && clanNumber > 0) buttonPrefix = 'craftclan_';
-
-    // Check if the button custom ID starts with `buttonPrefix`, indicating a shop purchase attempt
-    if (interaction.customId.startsWith(buttonPrefix)) {
+    // Check if the button custom ID starts with 'craft_', indicating a shop purchase attempt
+    if (interaction.customId.startsWith('craft_')) {
 
         // Defer the reply to prevent interaction timeout, reply is only visible to the user
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         // Extract the item 
-        const itemToBuyNameA = interaction.customId.replace(buttonPrefix, '').replace(/_/g, '');
+        const itemToBuyNameA = interaction.customId.replace('craft_', '').replace(/_/g, '');
         const itemToBuyName = itemToBuyNameA.split('@')[0];
         const itemToCraft = args.items.find(item => item.letter === itemToBuyName);
 
@@ -176,11 +171,13 @@ const handleCraftButtonClick = async (interaction, args) => {
         const isValid = resultPrepareItem.every(item => item.valid);
         if (isValid) {
 
+            // console.log("resultPrepareItem: ", resultPrepareItem);
+
             // update item
             let allUpdated = true, allUpdateResult = [];
             await Promise.all(resultPrepareItem.map(async ({ amount_owned, amount_new, userItemMatch }) => {
-                const userUpdObj = { id: userId, username: username };
-                const resultUpdate = await updateUserItem(userUpdObj, userItemMatch, amount_new);
+                const userUpdObj = { id: userId };
+                const resultUpdate = await updateUserItem(userUpdObj, userItemMatch, amount_owned, amount_new);
                 allUpdateResult.push(resultUpdate);
                 if (!resultUpdate) allUpdated = false;
             }));
@@ -196,6 +193,7 @@ const handleCraftButtonClick = async (interaction, args) => {
                     craftSuccess = await updateUserItem(
                         userUpdObj,
                         existingCraftedItem[0],
+                        currentAmount,
                         currentAmount + 1
                     );
                 } else {
@@ -218,12 +216,7 @@ const handleCraftButtonClick = async (interaction, args) => {
             }
             //await interaction.editReply(`This feature coming soon! (crafting ${itemToCraft.emoji} ${itemToCraft.name})\nStay tuned! for upcoming features!🤗`);
         } else {
-            // not enough material
-            // show what they don't have
-            const invalidMaterials = resultPrepareItem.filter(item => !item.valid);
-            const missingMaterials = invalidMaterials.map(item => `> ${item.name} (**${item.amount_owned}**/${item.amount})`).join('\n');
             await interaction.editReply(`Fail: You don't have enough material to craft **${itemToCraft.emoji} ${itemToCraft.name}**.`);
-            await interaction.followUp(`Missing: \n${missingMaterials}\nComeback again when you have the required materials!`);
         }
     }
 }
@@ -261,7 +254,7 @@ const getChannelIdForClanCraft = async (clanNumber) => {
 
 // --- Command Export ---
 module.exports = {
-    handleCraftCommand,
-    handleCraftButtonClick,
-    clanCraftChannels
+    handleFishingCommand,
+    // handleCraftButtonClick,
+    // clanCraftChannels
 };

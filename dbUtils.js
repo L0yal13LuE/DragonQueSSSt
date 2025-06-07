@@ -323,16 +323,16 @@ const getShop = async (channelId) => {
             .eq('channel_id', channelId)
             .single(); // Only one shop per channel
         
-        if (error) {
-            console.error(`Error fetching shop for channel ${channelId}:`, error.message);
-            return null;
-        }
+        // if (error) {
+        //     console.error(`Error fetching shop for channel ${channelId}:`, error.message);
+        //     return null;
+        // }
         
         if (!shopData) {
-            console.log(`No shop found for channel ${channelId}`);
+            // console.log(`No shop found for channel ${channelId}`);
         }
         
-        return shopData;
+        return shopData || null;
     } catch (error) {
         console.error(`Unexpected error fetching shop for ${channelId}:`, error);
         return null;
@@ -358,7 +358,7 @@ const getShopItems = async (shopId) => {
         }
         
         if (!shopItems || shopItems.length === 0) {
-            console.log(`No items found for shop ${shopId}`);
+            // console.log(`No items found for shop ${shopId}`);
         }
         
         return shopItems;
