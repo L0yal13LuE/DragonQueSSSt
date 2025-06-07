@@ -29,9 +29,8 @@ const { handleCraftCommand, handleCraftButtonClick, clanCraftChannels } = requir
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
 // const { handleSendCommand } = require('./slashCommandHandler.js');
 const { handleSendCommand } = require('./slashCommandHandler.js');
-const { handleBagCommand, handleBagPaginationInteraction } = require('./managers/bagPaginationManager.js');
-const { fetchRarity } = require('./managers/rarityManager.js');
-const { resetCachedDataOnStartUp } = require('./managers/cacheManager.js');
+const { handleBagCommand, handleBagPaginationInteraction} = require('./managers/bagPaginationManager.js');
+const { resetCachedDataOnStartUp, setCachedDataOnStartUp } = require('./managers/cacheManager.js');
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -123,7 +122,7 @@ client.once('ready', async () => {
     }
 
     resetCachedDataOnStartUp();
-    await fetchRarity();
+    setCachedDataOnStartUp();
 
     // Send Online Announcement
     if (announcementChannel) {

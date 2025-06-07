@@ -275,7 +275,6 @@ const deductCurrency = async (userId, userCurrency, itemDetails) => {
                 id: userCurrency.id,
                 material: userCurrency.material
             },
-            userCurrency.amount,
             newAmount
         );
     } catch (error) {
@@ -299,7 +298,6 @@ const addItemToInventory = async (userId, username, itemDetails) => {
                     id: existingItem[0].id,
                     material: existingItem[0].material
                 },
-                existingItem[0].amount,
                 existingItem[0].amount + itemDetails.material_amount
             );
             if (!success) return false;

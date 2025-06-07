@@ -1,12 +1,11 @@
+const CONSTANTS = require("./constants");
 const {
   getCachedData,
   saveCachedData,
   deleteCachedData,
-} = require("./managers/cacheManager");
+} = require("./providers/cacheProvider");
 
-const { fetchRarity } = require("./providers/rarityProvider");
-
-const { getMaterial, getUserItemV2 } = require("./providers/materialProvider");
+const { getMaterial, getUserItem } = require("./providers/materialProvider");
 
 const {
   deductItemFromUser,
@@ -30,24 +29,24 @@ const fetchUserItem = async (interaction) => {
   try {
     const itemNameInput = interaction.options.getString("item"); // User's input for autocomplete
     const userId = interaction.user.id;
-    const userBagKey = `bag_${userId}`;
+    const userBagKey = CONSTANTS.CACHE_USER_BAG_PREFIX + `_${userId}`;
 
     let allUserItemsData = null;
 
     if (itemNameInput === "") {
       await deleteCachedData(userBagKey);
 
-      const result = await getUserItemV2({ userId: userId, amount: 1 }, 0, -1);
+      const result = await getUserItem({ userId: userId, amount: 1 });
 
-      if (result.error || !result.data) {
+      if (!result || !result.length === 0) {
         console.error(
           `[Autocomplete] Error fetching bag for user ${userId} for cache:`,
-          result.error || "No data"
+          result || "No data"
         );
         await interaction.respond([]); // Respond with empty if DB fetch fails
         return;
       }
-      allUserItemsData = result.data;
+      allUserItemsData = result;
       // Save the fetched data to cache
       saveCachedData(userBagKey, allUserItemsData);
     } else {
@@ -59,10 +58,8 @@ const fetchUserItem = async (interaction) => {
       } else {
         // 2. Cache miss: Fetch all items (amount >= 1) for the user from DB
         // Pass page 0 and limit -1 to fetch all items according to our modification in getUserItem
-        const result = await getUserItemV2(
-          { userId: userId, amount: 1 },
-          0,
-          -1
+        const result = await getUserItem(
+          { userId: userId, amount: 1 }
         );
 
         if (result.error || !result.data) {
@@ -149,6 +146,7 @@ const handleSendCommandSubmission = async (interaction) => {
     const amountStr = interaction.options.getString("amount");
     const receiver = interaction.options.getUser("user");
     const sender = interaction.user;
+    const userBagKey = CONSTANTS.CACHE_USER_BAG_PREFIX + `_${sender.id}`;
 
     // Validate amount
     const amount = parseInt(amountStr, 10);
@@ -247,11 +245,10 @@ const handleSendCommandSubmission = async (interaction) => {
       );
       Promise.all([
         deleteCachedData(userBagKey),
-        // deleteUserBagCache(receiver.id),
       ])
         .then(() => {
           console.log(
-            `[Cache] Cleared bag cache for sender ${sender.id} and receiver ${receiver.id} after successful send.`
+            `[Cache] Cleared bag cache for sender ${sender.id} after successful send.`
           );
         })
         .catch((cacheErr) => {

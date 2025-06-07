@@ -180,7 +180,7 @@ const handleCraftButtonClick = async (interaction, args) => {
             let allUpdated = true, allUpdateResult = [];
             await Promise.all(resultPrepareItem.map(async ({ amount_owned, amount_new, userItemMatch }) => {
                 const userUpdObj = { id: userId };
-                const resultUpdate = await updateUserItem(userUpdObj, userItemMatch, amount_owned, amount_new);
+                const resultUpdate = await updateUserItem(userUpdObj, userItemMatch, amount_new);
                 allUpdateResult.push(resultUpdate);
                 if (!resultUpdate) allUpdated = false;
             }));
@@ -196,7 +196,6 @@ const handleCraftButtonClick = async (interaction, args) => {
                     craftSuccess = await updateUserItem(
                         userUpdObj,
                         existingCraftedItem[0],
-                        currentAmount,
                         currentAmount + 1
                     );
                 } else {
