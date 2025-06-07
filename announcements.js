@@ -60,7 +60,7 @@ const announceMonsterSpawn = (announcementChannel, monsterData) => {
             { name: 'วันที่ปรากฏตัว', value: monsterData.spawn_date, inline: true }
         ).setTimestamp();
     try {
-        announcementChannel.send({ content: "@everyone ภารกิจท้าทายรายวันมาแล้ว!", embeds: [spawnEmbed] });
+        announcementChannel.send({ content: "<@&1378563196763242557> ภารกิจท้าทายรายวันมาแล้ว!", embeds: [spawnEmbed] });
         console.log(`Announced spawn of ${monsterData.name}`);
     } catch (error) {
         console.error(`Error sending monster spawn announcement for ${monsterData.name}:`, error);
@@ -93,7 +93,7 @@ const announceMonsterDefeat = async (announcementChannel, monsterData) => {
     }
 
     try {
-        await announcementChannel.send({ content: "@everyone กำจัดมอนสเตอร์ประจำวันสำเร็จ!", embeds: [defeatEmbed] });
+        await announcementChannel.send({ content: "<@&1378563196763242557> กำจัดมอนสเตอร์ประจำวันสำเร็จ!", embeds: [defeatEmbed] });
         console.log(`Announced defeat of ${monsterData.name}`);
         await markRewardAnnounced(monsterData.spawn_date);
         await deleteMonsterHits(monsterData.spawn_date); // Delete hits after successful announcement and marking
