@@ -219,13 +219,14 @@ client.once('ready', async () => {
     await Promise.all(clanNumbers.map(async (clanNumber) => {
 
         // fetch craft channel for each clan
-        const channelsCraft = await clanCraftChannels(clanNumber)
+        const channelsCraft = await clanCraftChannels(clanNumber);
         if (channelsCraft && channelsCraft.length > 0) {
             const craftSettingPromises = channelsCraft.map(async (row) => {
                 const craftSetting = await craftClanSettings(row, clanNumber);
                 return { ...row, setting: craftSetting };
             });
-            clanCraftSettingData = await Promise.all(craftSettingPromises);
+            const allMappedCraftData = await Promise.all(craftSettingPromises);
+            clanCraftSettingData.push(...allMappedCraftData);
         }
 
         // fetch channel for each clan
