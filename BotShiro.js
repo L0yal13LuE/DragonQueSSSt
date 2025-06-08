@@ -23,9 +23,9 @@ const { handleMaterialCommand } = require('./managers/materialManager.js');
 
 // -- Addition Command Handlers ---
 const { handleLeaderboardCommand } = require('./managers/leaderBoardManager.js');
-const { shopSettings, craftSettings } = require('./managers/shopWorkshop.js');
+const { shopSettings, craftSettings, clanShopChannels, clanShopSetting, craftClanSettings } = require('./managers/shopWorkshop.js');
 const { handleShopCommand, handleShopSelectMenuClick } = require('./managers/shopManager.js');
-const { handleCraftCommand, handleCraftButtonClick } = require('./managers/craftManager.js');
+const { handleCraftCommand, handleCraftButtonClick, clanCraftChannels } = require('./managers/craftManager.js');
 const { getConfig } = require('./providers/configProvider.js'); // For loading dynamic configs
 // const { handleSendCommand } = require('./slashCommandHandler.js');
 const { handleSendCommand } = require('./slashCommandHandler.js');
@@ -78,6 +78,8 @@ let currentMonsterStateRef = { current: null };
 // -- Shop instance
 let shopWorkShopSettings = null;
 let craftWorkShopSettings = null;
+const clanShopSettingData = new Map();
+let clanCraftSettingData = [];
 
 // --- Bot Ready Event ---
 client.once('ready', async () => {
@@ -203,14 +205,47 @@ client.once('ready', async () => {
     // Setup Hourly Monster Check
     if (supabase && announcementChannel) {
         try {
-        console.log("Setting up hourly monster check...");
-        await gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef); // Initial check on startup
-        setInterval(() => gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef), CONSTANTS.HOURLY_CHECK_INTERVAL);
-        console.log(`Hourly monster check scheduled every ${CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)} minutes.`);
+            console.log("Setting up hourly monster check...");
+            await gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef); // Initial check on startup
+            setInterval(() => gameLogic.hourlyMonsterCheck(client, announcementChannel, currentMonsterStateRef), CONSTANTS.HOURLY_CHECK_INTERVAL);
+            console.log(`Hourly monster check scheduled every ${CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)} minutes.`);
         } catch (error) { console.error("Error setting up hourly monster check:", error); }
     } else {
         console.warn("Hourly monster check cannot be started: Supabase or Announcement Channel unavailable.");
     }
+
+    // Spawn clan shop from s1-s24
+    const clanNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], clanNumbersInitial = [];
+    await Promise.all(clanNumbers.map(async (clanNumber) => {
+
+        // fetch craft channel for each clan
+        const channelsCraft = await clanCraftChannels(clanNumber)
+        if (channelsCraft && channelsCraft.length > 0) {
+            const craftSettingPromises = channelsCraft.map(async (row) => {
+                const craftSetting = await craftClanSettings(row, clanNumber);
+                return { ...row, setting: craftSetting };
+            });
+            clanCraftSettingData = await Promise.all(craftSettingPromises);
+        }
+
+        // fetch channel for each clan
+        const channels = await clanShopChannels(clanNumber);
+        if (channels && channels.length > 0) {
+
+            // fetch shop data for each channel in clan
+            await Promise.all(channels.map(async (channelID) => {
+                const shopSetting = await clanShopSetting(channelID, clanNumber);
+                if (shopSetting) {
+                    clanShopSettingData.set(channelID, shopSetting);
+                } else clanShopSettingData.delete(channelID);
+            }));
+
+            // save staged data (for counting)
+            clanNumbersInitial.push({ clanNumber, channels });
+        }
+    }));
+    //console.log(`[Clan Craft] : Loaded ${clanCraftSettingData.length} items.`);
+    //console.log(`[Clan Shop] : Loaded ${clanNumbersInitial.length} items.`);
 });
 
 // --- Message Create Event ---
@@ -231,13 +266,29 @@ client.on('messageCreate', async (message) => {
             //     handleLeaderboardCommand(message, client);
             //     break;
             case 'shop':
+                // check if message channel id matching clan shop settiings channel ids
+                if (clanShopSettingData.has(message.channel.id)) {
+                    const shopClanInitData = clanShopSettingData.get(message.channel.id);
+                    if (shopClanInitData && shopClanInitData.items.length > 0) {
+                        await handleShopCommand(message, shopClanInitData);
+                        return;
+                    }
+                }
+                // somehow shop clan command is not valid -> try normal shop command
                 if (shopWorkShopSettings) {
-                    shopWorkShopSettings = await handleShopCommand(message, shopWorkShopSettings);
+                    await handleShopCommand(message, shopWorkShopSettings);
                 }
                 break;
             case 'craft':
-                if (craftWorkShopSettings) {
-                    await handleCraftCommand(message, craftWorkShopSettings);
+                // find out if user typing this craft command in clan channel and craft command is valid
+                const craftInClan = clanCraftSettingData.find(row => row.channel_id == message.channel.id);
+                if (craftInClan && craftInClan.setting && craftInClan.setting.items.length > 0) {
+                    await handleCraftCommand(message, craftInClan.setting);
+                } else {
+                    // somehow craft clan command is not valid -> try normal craft command
+                    if (craftWorkShopSettings) {
+                        await handleCraftCommand(message, craftWorkShopSettings);
+                    }
                 }
                 break;
             // case 'chat': // useless ?
@@ -310,6 +361,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
     try {
         if (interaction.customId) console.error("Events.InteractionCreate : start!", interaction.customId);
         if (interaction.isStringSelectMenu() && interaction.customId.startsWith("shop_base") && shopWorkShopSettings) {
+            // check if button is in clan shop
+            if (clanShopSettingData && clanShopSettingData.has(interaction.channelId)) {
+                const shopClanInitData = clanShopSettingData.get(interaction.channelId);
+                if (shopClanInitData && shopClanInitData.items.length > 0) {
+                    await handleShopSelectMenuClick(interaction, shopClanInitData);
+                    return;
+                }
+            }
+            // button is not in clan shop
             await handleShopSelectMenuClick(interaction, shopWorkShopSettings);
             return;
         }
@@ -320,6 +380,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
         ) {
             console.log("[Craft] Click Button : ", interaction.customId);
             await handleCraftButtonClick(interaction, craftWorkShopSettings);
+            return;
+        }
+        if (interaction.isButton() && interaction.customId.startsWith("craftclan_")) {
+            const craftInClan = clanCraftSettingData.find(row => row.channel_id == interaction.channelId);
+            if (craftInClan && craftInClan.setting && craftInClan.setting.items.length > 0) {
+                console.log("[CraftClan] Click Button : ", interaction.customId);
+                await handleCraftButtonClick(interaction, craftInClan.setting);
+                return;
+            }
             return;
         }
         if (interaction.commandName === "send") {

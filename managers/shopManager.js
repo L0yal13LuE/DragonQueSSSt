@@ -30,14 +30,13 @@ const buildRowComponents = async (message, args, refreshItem) => {
     const itemsInSelectMenu = [];
     args.items.forEach((item, index) => {
         const amountSuffix = (item.amount > 1) ? `(x${item.amount.toLocaleString()})` : '';
-        const itemValue = `${item.materials.id}-${item.amount}-${item.materials.emoji}-${item.materials.name}/${item.material_use_id}-${item.price}-${item.currency}`;
+        const itemValue = `${item.materials.id}-${item.amount}-${(item.materials.emoji.indexOf('?') > -1) ? '⚪️' : item.materials.emoji}-${item.materials.name}/${item.material_use_id}-${item.price}-${item.currency}`;
         //const itemDesc = `${item.price.toLocaleString()} ${item.currency} (Owned: ${item.owned.toLocaleString()})`;
         const itemDesc = `${item.price.toLocaleString()} ${item.currency}`;
         itemsInSelectMenu[index] = new StringSelectMenuOptionBuilder()
             .setLabel(`${item.materials.name} ${amountSuffix}`)
             .setDescription(itemDesc)
-            .setValue(itemValue)
-            .setEmoji(item.materials.emoji);
+            .setValue(itemValue);
     });
 
     // const clearAmouunt = new StringSelectMenuOptionBuilder()
@@ -93,41 +92,44 @@ const handleShopCommand = async (message, args) => {
         }
 
         // --- 1. Create Embed text ---
-        const baseEmbed = createBaseEmbed({
+        const embedObj = {
             color: '#0099ff',
             title: args.title,
             description: `${args.description}\n\nYou can retry if purchase failed.\nExpire in ${autoClose} minute. ${expirationTimestamp}\n*please make purchase 30 seconds before closing*`,
-            thumbnail: args.thumbnail,
+            thumbnail: args.thumbnail || null,
             footer: { 'text': args.footer },
-        });
+        };
+        const baseEmbed = createBaseEmbed(embedObj);
 
         // --- 2. Create Embed with Items ---
         // --- 3. Add items as fields to the embed using the new parameters
         const rows = await buildRowComponents(message, args, true);
 
         // --- 4. Send the embed with the select menus ---
-        let reply = await message.reply({
+        const reply = await message.reply({
             embeds: [baseEmbed],
             components: rows,
         });
 
 
         // --- 5. Delete the message after 1 minute ---
-        let instanceTimeout = setTimeout(async () => {
+        const instanceTimeout = setTimeout(async () => {
             try {
                 if (instanceTimeout) clearTimeout(instanceTimeout);
                 await reply.delete();
-                await message.reply('**Shop session closed.** Use `!shop` to open again.');
+                await message.reply('*Shop session closed.*');
             } catch (errorDel) {
                 console.error('Error deleting message:', errorDel);
             }
         }, autoCloseTimer);
 
-        args.instance.set(userId, reply);
-        args.instanceTimeout.set(userId, instanceTimeout);
+        try {
+            args.instance.set(userId, reply);
+            args.instanceTimeout.set(userId, instanceTimeout);
+        } catch (errorSet) {
+            console.error('Error setting instance:', errorSet);
+        }
 
-        // args.instance[userId] = reply
-        // args.instanceTimeout[userId] = instanceTimeout;
         return args;
     } catch (error) {
         console.error('Error sending shop embed with buttons:', error);
@@ -171,22 +173,7 @@ const handleShopSelectMenuClick = async (interaction, args) => {
         // Process purchase
         await processPurchase(interaction, itemDetails);
 
-        // for testing done
-        // await interaction.channel.send('Purchase successful!');
-
-        // if (args.instance && args.instance[userId]) {
-        //     await args.instance[userId].delete();
-        //     args.instance[userId] = null;
-        // } else {
-        //     console.log('args.instance : not found', args);
-        // }
-        // if (args.instanceTimeout && args.instanceTimeout[userId]) {
-        //     clearTimeout(args.instanceTimeout[userId]);
-        //     args.instanceTimeout[userId] = null;
-        // } else {
-        //     console.log('args.instanceTimeout : not found', args);
-        // }
-
+        // Delete embedpost after purchase
         const shopMessage = args.instance.get(userId);
         if (shopMessage) {
             try {
@@ -194,13 +181,13 @@ const handleShopSelectMenuClick = async (interaction, args) => {
             } catch (errorDel) {
                 if (errorDel.code !== 10008) console.error('Error deleting main shop message after purchase:', errorDel);
             }
-            args.instance.delete(userId); // Remove from Map
+            args.instance.delete(userId);
         }
         if (args.instanceTimeout.has(userId)) {
             clearTimeout(args.instanceTimeout.get(userId));
-            args.instanceTimeout.delete(userId); // Remove from Map
+            args.instanceTimeout.delete(userId);
         }
-        return true; // Indicate successful handling, collector will stop
+        return true;
     } catch (error) {
         console.error('Shop purchase error:', error);
         await handlePurchaseError(interaction, error);
@@ -237,7 +224,8 @@ const processPurchase = async (interaction, itemDetails) => {
     // Check user's currency balance
     const userCurrency = await getUserItem({
         userId: userId,
-        itemId: itemDetails.material_use_id
+        itemId: itemDetails.material_use_id,
+        amount: 1
     });
 
     if (!userCurrency?.length) {
@@ -254,7 +242,7 @@ const processPurchase = async (interaction, itemDetails) => {
     }
 
     // Process currency deduction
-    const success = await deductCurrency(userId, userCurrency[0], itemDetails);
+    const success = await deductCurrency(userId, username, userCurrency[0], itemDetails);
     if (!success) {
         await interaction.editReply(`Something went wrong while deducting your currency. Please try again later.`);
         // await interaction.followUp(`Something went wrong while deducting your currency. Please try again later.`);
@@ -262,7 +250,7 @@ const processPurchase = async (interaction, itemDetails) => {
     }
 
     // Process item addition
-    const updateItemResult = await addItemToInventory(userId, username, itemDetails);
+    const updateItemResult = await addItemToInventory(userId, username, itemDetails, userCurrency[0]);
     if (!updateItemResult) {
         await interaction.editReply(`Something went wrong while adding the item to your inventory. Please try again later.`);
         // await interaction.followUp(`Something went wrong while adding the item to your inventory. Please try again later.`);
@@ -279,14 +267,15 @@ const processPurchase = async (interaction, itemDetails) => {
     return;
 };
 
-const deductCurrency = async (userId, userCurrency, itemDetails) => {
+const deductCurrency = async (userId, username, userCurrency, itemDetails) => {
     try {
         const newAmount = userCurrency.amount - itemDetails.price;
         return await updateUserItem(
-            { id: userId },
+            { id: userId, username: username },
             {
                 id: userCurrency.id,
-                material: userCurrency.material
+                material: userCurrency.material,
+                amount: userCurrency.amount
             },
             newAmount
         );
@@ -297,8 +286,9 @@ const deductCurrency = async (userId, userCurrency, itemDetails) => {
 
 };
 
-const addItemToInventory = async (userId, username, itemDetails) => {
+const addItemToInventory = async (userId, username, itemDetails, userCurrency) => {
     try {
+        const userObj = { id: userId, username: username };
         const existingItem = await getUserItem({
             userId: userId,
             itemId: itemDetails.material_id
@@ -306,10 +296,11 @@ const addItemToInventory = async (userId, username, itemDetails) => {
 
         if (existingItem?.length) {
             const success = await updateUserItem(
-                { id: userId },
+                userObj,
                 {
                     id: existingItem[0].id,
-                    material: existingItem[0].material
+                    material: existingItem[0].material,
+                    amount: existingItem[0].amount
                 },
                 existingItem[0].amount + itemDetails.material_amount
             );
@@ -317,8 +308,11 @@ const addItemToInventory = async (userId, username, itemDetails) => {
             return true;
         } else {
             const success = await insertUserItem(
-                { id: userId, username: username },
-                { id: itemDetails.material_id, name: itemDetails.name },
+                userObj,
+                {
+                    id: itemDetails.material_id,
+                    name: itemDetails.name
+                },
                 itemDetails.material_amount
             );
             if (!success) return false;
