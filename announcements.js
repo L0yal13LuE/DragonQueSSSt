@@ -18,10 +18,12 @@ const {
 const ANNOUNCEMENT_CHANNEL_ID = process.env.ANNOUNCEMENT_CHANNEL_ID; // For level-ups ONLY
 const ITEM_DROP_CHANNEL_ID = process.env.ITEM_DROP_CHANNEL_ID; // For item-drop- ONLY
 const DAMAGE_LOG_CHANNEL_ID = process.env.DAMAGE_LOG_CHANNEL_ID; // For item-drop- ONLY
+const LEVEL_CHANNEL_ID = process.env.LEVEL_CHANNEL_ID; // For item-drop- ONLY
 
 let announcementChannel = null;
 let itemDropChannel = null;
 let damageLogChannel = null;
+let levelChannel = null;
 
 /**
  * Fetches a channel by its ID.
@@ -82,7 +84,7 @@ const sendOnlineAnnouncement = async () => {
  * Sends a level up announcement embed to the announcement channel.
  */
 const handleLevelUpAnnouncement = (message, newLevel, currentExp) => {
-  if (!announcementChannel) {
+  if (!levelChannel) {
     console.warn(
       `[${message.author.username}] Leveled up, but announcement channel unavailable.`
     );
@@ -110,7 +112,7 @@ const handleLevelUpAnnouncement = (message, newLevel, currentExp) => {
     .setTimestamp();
 
   try {
-    announcementChannel.send({ embeds: [levelUpEmbed] });
+    levelChannel.send({ embeds: [levelUpEmbed] });
     console.log(`[${message.author.username}] Sent level up announcement.`);
   } catch (error) {
     console.error(
@@ -260,15 +262,6 @@ const announceDamageDealt = (message, currentMonsterStateRef, damageDealt) => {
   }
 };
 
-/**
- * Initializes and fetches essential bot channels.
- * @param {import('discord.js').Client} client - The Discord client.
- * @param {object} channelIds - An object containing the IDs of the channels to fetch.
- * @param {string} [channelIds.ANNOUNCEMENT_CHANNEL_ID] - The ID for the announcement channel.
- * @param {string} [channelIds.ITEM_DROP_CHANNEL_ID] - The ID for the item drop channel.
- * @param {string} [channelIds.DAMAGE_LOG_CHANNEL_ID] - The ID for the damage log channel.
- * @returns {Promise<{announcementChannel: import('discord.js').Channel|null, itemDropChannel: import('discord.js').Channel|null, damageLogChannel: import('discord.js').Channel|null}>}
- */
 const initializeBotChannels = async (client) => {
   announcementChannel = await _fetchChannelById(
     client,
@@ -285,8 +278,7 @@ const initializeBotChannels = async (client) => {
     DAMAGE_LOG_CHANNEL_ID,
     "Damage Log"
   );
-
-  return { announcementChannel, itemDropChannel, damageLogChannel };
+  levelChannel = await _fetchChannelById(client, LEVEL_CHANNEL_ID, "Level");
 };
 
 module.exports = {
