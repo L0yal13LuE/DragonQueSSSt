@@ -179,21 +179,28 @@ const createMonsterDefeatEmbed = (monsterData) => {
 
 // --- Game Logic Embeds ---
 
-const createItemDropEmbed = (author, item, amount, channelId) => {
-  return createBaseEmbed({
+const createItemDropEmbed = (message, selectedItem, itemAmount) => {
+  const itemDropEmbed = createBaseEmbed({
     color: 0xffd700,
-    title: "✨ Item Found! ✨",
-    description: `${author.toString()} found an item!`,
+    title: "✨ Found Item! ✨",
+    description: `${message.author.toString()} got the item!`,
   }).addFields(
-    { name: "Item", value: `${item.emoji} ${item.name}`, inline: true },
-    { name: "Amount", value: amount.toString(), inline: true },
-    { name: "Found In", value: `<#${channelId}>`, inline: true }
+    { name: "Rarity", value: `${selectedItem.rarityEmoji}`, inline: true },
+    {
+      name: "Item",
+      value: `${selectedItem.name} ${selectedItem.emoji}`,
+      inline: true,
+    },
+    { name: "Amount", value: itemAmount.toString(), inline: true },
+    { name: "From", value: `<#${message.channelId}>`, inline: true }
   );
+
+  return itemDropEmbed;
 };
 
 const createDamageEmbed = (author, monsterName, damageDealt) => {
   return createBaseEmbed({
-    color: 0xDC143C, // Crimson red for damage
+    color: 0xdc143c, // Crimson red for damage
     title: "💥 Monster Hit! 💥",
     description: `${author.toString()} landed a blow on **${monsterName}**!`,
   }).addFields(
