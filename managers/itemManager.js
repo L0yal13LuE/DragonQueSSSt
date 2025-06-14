@@ -6,16 +6,10 @@ const {
   updateUserItem,
 } = require("../providers/materialProvider");
 const { getConfig } = require("../providers/configProvider");
-const { createBaseEmbed } = require("./embedManager");
+const { announceItemDrop } = require("../announcements");
 
 let baseDropRate = 0.15;
-const handleItemDropV2 = async (message, channel) => {
-  const channelId = message.channel.id;
-  if (!supabase) {
-    console.warn("[ItemDrop] Supabase client not available.");
-    return [];
-  }
-
+const handleItemDrop = async (message) => {
   // 1. Determine Item List and Area Type
   const materialData = await fetchOrGetMaterialChannel({
     channelId: message.channel.id,
@@ -25,7 +19,7 @@ const handleItemDropV2 = async (message, channel) => {
 
   const areaType = materialData[0].channel.areaChannel[0].area.name;
 
-  const itemList = []; // Empty array
+  const itemList = [];
   materialData.forEach((item) => {
     const obj = {
       id: item.material.id,
@@ -36,7 +30,7 @@ const handleItemDropV2 = async (message, channel) => {
       rarityEmoji: item.material.rarity.emoji,
     };
 
-    itemList.push(obj); // Add object to array
+    itemList.push(obj);
   });
 
   // 2. Calculate Total Drop Probability for the Area
@@ -46,23 +40,12 @@ const handleItemDropV2 = async (message, channel) => {
 
   // 3. Check if ANY drop occurs based on total area probability
   const dropRoll = Math.random();
-  // console.log(
-  //   `[Drop Logic] Initial drop roll: ${dropRoll.toFixed(
-  //     5
-  //   )} (Needed < ${totalAreaDropProbability.toFixed(5)} for a drop)`
-  // );
 
   // 4. If a drop occurs, determine WHICH item drops (Weighted Selection)
   if (dropRoll >= totalAreaDropProbability) {
-    // No drop occurred based on the initial roll
     console.log(`[Drop Logic] Initial drop roll failed. No drop occurred.`);
-    // console.log(`--- Drop Logic Finished ---\n`);
     return []; // Return empty array indicating no drop
   }
-
-  // console.log(
-  //   "[Drop Logic] Initial drop roll successful. Proceeding to item selection."
-  // );
 
   const selectedItem = selectWeightedItem(itemList, areaType);
 
@@ -70,34 +53,14 @@ const handleItemDropV2 = async (message, channel) => {
     console.log(
       `[Drop Logic] Drop Success! Selected Item: ${selectedItem.emoji} ${selectedItem.name}`
     );
-    // console.log(`--- Drop Logic Finished ---\n`);
 
     // 5. Insert item
     const itemAmount = 1;
     let itemInserted = insertDropItems(message, selectedItem);
 
     // 6. Send reply
-    if (itemInserted && channel) {
-      // console.log(
-      //   `[${message.author.username}] Sending item drop announcement.`
-      // );
-
-      const itemDropEmbed = createBaseEmbed({
-        color: 0xffd700,
-        title: "✨ Found Item! ✨",
-        description: `${message.author.toString()} got the item!`,
-      }).addFields(
-        { name: "Rarity", value: `${selectedItem.rarityEmoji}`, inline: true },
-        {
-          name: "Item",
-          value: `${selectedItem.name} ${selectedItem.emoji}`,
-          inline: true,
-        },
-        { name: "Amount", value: itemAmount.toString(), inline: true },
-        { name: "From", value: `<#${channelId}>`, inline: true }
-      );
-
-      channel.send({ embeds: [itemDropEmbed] });
+    if (itemInserted) {
+      announceItemDrop(message, selectedItem, itemAmount);
     } else if (itemInserted) {
       console.warn(
         `[${message.author.username}] Earned item, but announcement channel unavailable for announcement.`
@@ -106,10 +69,10 @@ const handleItemDropV2 = async (message, channel) => {
 
     return [selectedItem]; // Return the single chosen item as an array
   } else {
-    // console.warn(
-    //   `[Drop Logic] Initial drop successful, but no item was selected in weighted selection for ${areaType} area.`
-    // );
-    // console.log(`--- Drop Logic Finished ---\n`);
+    console.warn(
+      `[Drop Logic] Initial drop successful, but no item was selected in weighted selection for ${areaType} area.`
+    );
+    console.log(`--- Drop Logic Finished ---\n`);
     return []; // Should not happen if droppableItems.length > 0 and weightedTotal > 0
   }
 };
@@ -265,5 +228,5 @@ const selectWeightedItem = (droppableItems, areaType) => {
 };
 
 module.exports = {
-  handleItemDropV2,
+  handleItemDrop,
 };
