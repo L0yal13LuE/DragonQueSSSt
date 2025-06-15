@@ -13,6 +13,7 @@ const { markRewardAnnounced, deleteMonsterHits } = require("./dbUtils"); // Need
 const {
   createItemDropEmbed,
   createDamageEmbed,
+  createItemTransferEmbed,
 } = require("./managers/embedManager");
 
 const ANNOUNCEMENT_CHANNEL_ID = process.env.ANNOUNCEMENT_CHANNEL_ID; // For level-ups ONLY
@@ -243,6 +244,24 @@ const announceItemDrop = (message, selectedItem, itemAmount) => {
   }
 };
 
+const announceItemTransfer = (receiver, selectedItem, itemAmount, sender) => {
+  try {
+    const itemDropEmbed = createItemTransferEmbed(
+      receiver,
+      selectedItem,
+      itemAmount,
+      sender
+    );
+    itemDropChannel.send({ embeds: [itemDropEmbed] });
+    console.log(`[${receiver.username}] Sending item drop announcement.`);
+  } catch (error) {
+    console.error(
+      `Error sending item drop announcement for ${message.author.username}:`,
+      error
+    );
+  }
+};
+
 const announceDamageDealt = (message, currentMonsterStateRef, damageDealt) => {
   try {
     const damageEmbed = createDamageEmbed(
@@ -288,5 +307,6 @@ module.exports = {
   announceMonsterDefeat,
   announceItemDrop,
   announceDamageDealt,
+  announceItemTransfer,
   initializeBotChannels,
 };
