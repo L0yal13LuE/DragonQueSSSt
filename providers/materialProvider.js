@@ -6,7 +6,9 @@ const getMaterial = async (filters = {}) => {
       console.error("Supabase client not available in getMaterial");
       return null;
     }
-    let query = supabase.from("materials").select("*");
+    let query = supabase
+      .from("materials")
+      .select("*, rarity:rarities(name, drop_rate, emoji)");
 
     // Dynamically apply filters if provided
     if ("is_active" in filters) {

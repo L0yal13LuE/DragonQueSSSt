@@ -198,6 +198,25 @@ const createItemDropEmbed = (message, selectedItem, itemAmount) => {
   return itemDropEmbed;
 };
 
+const createItemTransferEmbed = (receiver, selectedItem, itemAmount, sender) => {
+  const itemDropEmbed = createBaseEmbed({
+    color: 0xffd700,
+    title: "✨ Item Transfered ✨",
+    description: `${receiver} got the item!`,
+  }).addFields(
+    { name: "Rarity", value: `${selectedItem.rarity.emoji}`, inline: true },
+    {
+      name: "Item",
+      value: `${selectedItem.name} ${selectedItem.emoji}`,
+      inline: true,
+    },
+    { name: "Amount", value: itemAmount.toString(), inline: true },
+    { name: "From", value: `${sender}`, inline: true }
+  );
+
+  return itemDropEmbed;
+};
+
 const createDamageEmbed = (author, monsterName, damageDealt) => {
   return createBaseEmbed({
     color: 0xdc143c, // Crimson red for damage
@@ -220,5 +239,6 @@ module.exports = {
   createMonsterDefeatEmbed,
   createItemDropEmbed,
   createDamageEmbed,
+  createItemTransferEmbed,
   createBaseEmbed,
 };
