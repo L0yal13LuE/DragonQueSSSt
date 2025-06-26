@@ -53,6 +53,11 @@ const {
   handleBagPaginationInteraction,
 } = require("./managers/bagPaginationManager.js");
 // const { resetCachedDataOnStartUp, setCachedDataOnStartUp } = require('./managers/cacheManager.js');
+const {
+  handleDonationListCommand,
+  handleDonationListInteraction,
+  handleDonateButtonClick
+} = require("./managers/clanDonationManager.js");
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -219,8 +224,7 @@ client.once("ready", async () => {
         CONSTANTS.HOURLY_CHECK_INTERVAL
       );
       console.log(
-        `Hourly monster check scheduled every ${
-          CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)
+        `Hourly monster check scheduled every ${CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)
         } minutes.`
       );
     } catch (error) {
@@ -234,9 +238,9 @@ client.once("ready", async () => {
 
   // Spawn clan shop from s1-s24
   const clanNumbers = [
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-      22, 23, 24,
-    ],
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+    22, 23, 24,
+  ],
     clanNumbersInitial = [];
   await Promise.all(
     clanNumbers.map(async (clanNumber) => {
@@ -347,6 +351,24 @@ client.on("messageCreate", async (message) => {
         break;
       case "material":
         handleMaterialCommand(message); // Keep using the imported manager
+        break;
+      case "donate":
+      case "donation":
+        const channelClanNumber = clanShopSettingData.get(message.channel.id)?.clanNumber;
+        const donationChannelClanObj = clanCraftSettingData.find(
+          (row) => row.channel_id == message.channel.id
+        );
+        const donationClanNumber =
+          donationChannelClanObj && donationChannelClanObj.setting
+            ? donationChannelClanObj.setting.clanNumber
+            : 0;
+        const clanNumber = Math.max(channelClanNumber || 0, donationClanNumber);
+        if (clanNumber > 0) {
+          console.log(`[Clan] Opened Clan Donation in S${clanNumber} Channel`);
+          await handleDonationListCommand(message, clanNumber);
+        } else {
+          message.reply("You must be in clan channel to use this command.");
+        }
         break;
       // Add other commands here with their respective 'case' and 'break;'
       // default:
@@ -462,6 +484,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isButton() && interaction.customId.startsWith("bag_nav_")) {
       // bag navigation button interaction received
       await handleBagPaginationInteraction(interaction);
+      return;
+    }
+    // donation list navigation button
+    if (interaction.isButton() &&
+      interaction.customId.startsWith("donationlist_nav_")) {
+      await handleDonationListInteraction(interaction);
+      return;
+    }
+    // donation item button
+    if (interaction.isButton() &&
+      interaction.customId.startsWith("donationitem_")
+    ) {
+      console.log("[Donate] Click Button : ", interaction.customId);
+      await handleDonateButtonClick(interaction);
       return;
     }
   } catch (error) {
