@@ -489,7 +489,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // donation list navigation button
     if (interaction.isButton() &&
       interaction.customId.startsWith("donationlist_nav_")) {
-      await handleDonationListInteraction(interaction);
+      await handleDonationListInteraction(interaction, clanShopSettingData, clanCraftSettingData);
       return;
     }
     // donation item button
@@ -497,7 +497,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       interaction.customId.startsWith("donationitem_")
     ) {
       console.log("[Donate] Click Button : ", interaction.customId);
-      await handleDonateButtonClick(interaction);
+      await handleDonateButtonClick(interaction, clanShopSettingData, clanCraftSettingData);
       return;
     }
   } catch (error) {
