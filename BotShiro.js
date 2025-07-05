@@ -53,6 +53,16 @@ const {
   handleBagPaginationInteraction,
 } = require("./managers/bagPaginationManager.js");
 // const { resetCachedDataOnStartUp, setCachedDataOnStartUp } = require('./managers/cacheManager.js');
+const {
+  handleDonationListCommand,
+  handleDonationListInteraction,
+  handleDonateButtonClick
+} = require("./managers/clanDonationManager.js");
+const {
+  handleCraftListCommand,
+  handleCraftListInteraction,
+  handleCraftListButtonClick
+} = require("./managers/craftPaginationManager.js");
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -219,8 +229,7 @@ client.once("ready", async () => {
         CONSTANTS.HOURLY_CHECK_INTERVAL
       );
       console.log(
-        `Hourly monster check scheduled every ${
-          CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)
+        `Hourly monster check scheduled every ${CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)
         } minutes.`
       );
     } catch (error) {
@@ -234,9 +243,9 @@ client.once("ready", async () => {
 
   // Spawn clan shop from s1-s24
   const clanNumbers = [
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-      22, 23, 24,
-    ],
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+    22, 23, 24,
+  ],
     clanNumbersInitial = [];
   await Promise.all(
     clanNumbers.map(async (clanNumber) => {
@@ -306,26 +315,27 @@ client.on("messageCreate", async (message) => {
         // somehow shop clan command is not valid -> try normal shop command
         if (shopWorkShopSettings) {
           await handleShopCommand(message, shopWorkShopSettings);
+          return;
         }
         break;
-      case "craft":
-        // find out if user typing this craft command in clan channel and craft command is valid
-        const craftInClan = clanCraftSettingData.find(
-          (row) => row.channel_id == message.channel.id
-        );
-        if (
-          craftInClan &&
-          craftInClan.setting &&
-          craftInClan.setting.items.length > 0
-        ) {
-          await handleCraftCommand(message, craftInClan.setting);
-        } else {
-          // somehow craft clan command is not valid -> try normal craft command
-          if (craftWorkShopSettings) {
-            await handleCraftCommand(message, craftWorkShopSettings);
-          }
-        }
-        break;
+      // case "craft": // old craft
+      //   // find out if user typing this craft command in clan channel and craft command is valid
+      //   const craftInClan = clanCraftSettingData.find(
+      //     (row) => row.channel_id == message.channel.id
+      //   );
+      //   if (
+      //     craftInClan &&
+      //     craftInClan.setting &&
+      //     craftInClan.setting.items.length > 0
+      //   ) {
+      //     await handleCraftCommand(message, craftInClan.setting);
+      //   } else {
+      //     // somehow craft clan command is not valid -> try normal craft command
+      //     if (craftWorkShopSettings) {
+      //       await handleCraftCommand(message, craftWorkShopSettings);
+      //     }
+      //   }
+      //   break;
       // case 'chat': // useless ?
       //     commandHandlers.handleChatCommand(message, args);
       //     break;
@@ -348,6 +358,36 @@ client.on("messageCreate", async (message) => {
         break;
       case "material":
         handleMaterialCommand(message); // Keep using the imported manager
+        break;
+      case "donate":
+      case "donation":
+        const channelClanNumber = clanShopSettingData.get(message.channel.id)?.clanNumber;
+        const donationChannelClanObj = clanCraftSettingData.find(
+          (row) => row.channel_id == message.channel.id
+        );
+        const donationClanNumber =
+          donationChannelClanObj && donationChannelClanObj.setting
+            ? donationChannelClanObj.setting.clanNumber
+            : 0;
+        const clanNumber = Math.max(channelClanNumber || 0, donationClanNumber);
+        if (clanNumber > 0) {
+          console.log(`[Clan] Opened Clan Donation in S${clanNumber} Channel`);
+          await handleDonationListCommand(message, clanNumber);
+        } else {
+          message.reply("You must be in clan channel to use this command.");
+        }
+        break;
+      case 'craft': // new craft with pagination
+        const craftInClanB = clanCraftSettingData.find( (row) => row.channel_id == message.channel.id );
+        if (craftInClanB && craftInClanB.setting && craftInClanB.setting.items.length > 0) {
+          // in clan
+          await handleCraftListCommand(message, craftInClanB.setting)
+          return;
+        } else {
+          // in normal
+          if (craftWorkShopSettings) await handleCraftListCommand(message, craftWorkShopSettings) 
+          else message.reply(`Craft command is not available right now.`);
+        }
         break;
       // Add other commands here with their respective 'case' and 'break;'
       // default:
@@ -488,6 +528,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return;
     } else if (interaction.commandName === "leaderboard") {
       await handleLeaderboardCommand(interaction);
+      return;
+    }
+    // donation list navigation button
+    if (interaction.isButton() &&
+      interaction.customId.startsWith("donationlist_nav_")) {
+      await handleDonationListInteraction(interaction, clanShopSettingData, clanCraftSettingData);
+      return;
+    }
+    // donation item button
+    if (interaction.isButton() &&
+      interaction.customId.startsWith("donationitem_")
+    ) {
+      console.log("[Donate] Click Button : ", interaction.customId);
+      await handleDonateButtonClick(interaction, clanShopSettingData, clanCraftSettingData);
+      return;
+    }
+    // craft list navigation button
+    if (interaction.isButton() &&
+      interaction.customId.startsWith("craftlist_nav_")) {
+      await handleCraftListInteraction(interaction, clanShopSettingData, clanCraftSettingData);
+      return;
+    }
+    // craft item button
+    if (interaction.isButton() &&
+      interaction.customId.startsWith("crafitem_")) {
+      await handleCraftListButtonClick(interaction, clanShopSettingData, clanCraftSettingData);
       return;
     }
   } catch (error) {

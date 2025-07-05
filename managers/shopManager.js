@@ -117,7 +117,7 @@ const handleShopCommand = async (message, args) => {
             try {
                 if (instanceTimeout) clearTimeout(instanceTimeout);
                 await reply.delete();
-                await message.reply('*Shop session closed.*');
+                // await message.reply('*Shop session closed.*');
             } catch (errorDel) {
                 console.error('Error deleting message:', errorDel);
             }
@@ -229,38 +229,33 @@ const processPurchase = async (interaction, itemDetails) => {
     });
 
     if (!userCurrency?.length) {
-        await interaction.editReply(`You don't have any **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!`);
-        // await interaction.followUp(`You don't have **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!`);
+        await interaction.followUp(`You don't have any **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!`);
         return;
     }
 
     const currentBalance = userCurrency[0].amount;
     if (currentBalance < itemDetails.price) {
-        await interaction.editReply(`You don't have enough **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!, You have **${currentBalance.toLocaleString()} ${itemDetails.currency}**`);
-        // await interaction.followUp(`You don't have enough **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!, You have **${currentBalance.toLocaleString()} ${itemDetails.currency}**`);
+        await interaction.followUp(`You don't have enough **${itemDetails.price.toLocaleString()} ${itemDetails.currency}**!, You have **${currentBalance.toLocaleString()} ${itemDetails.currency}**`);
         return;
     }
 
     // Process currency deduction
     const success = await deductCurrency(userId, username, userCurrency[0], itemDetails);
     if (!success) {
-        await interaction.editReply(`Something went wrong while deducting your currency. Please try again later.`);
-        // await interaction.followUp(`Something went wrong while deducting your currency. Please try again later.`);
+        await interaction.followUp(`Something went wrong while deducting your currency. Please try again later.`);
         return;
     }
 
     // Process item addition
     const updateItemResult = await addItemToInventory(userId, username, itemDetails, userCurrency[0]);
     if (!updateItemResult) {
-        await interaction.editReply(`Something went wrong while adding the item to your inventory. Please try again later.`);
-        // await interaction.followUp(`Something went wrong while adding the item to your inventory. Please try again later.`);
+        await interaction.followUp(`Something went wrong while adding the item to your inventory. Please try again later.`);
         return;
     }
 
     // Send success messages
     const successMessage = `Buying **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency}), Please wait...`;
-    await interaction.editReply(successMessage);
-    // await interaction.followUp(successMessage);
+    await interaction.followUp(successMessage);
     await interaction.channel.send(
         `<@${userId}> bought **${itemDetails.emoji} ${itemDetails.name}** x ${itemDetails.material_amount.toLocaleString()} (${itemDetails.price.toLocaleString()} ${itemDetails.currency})`
     );
