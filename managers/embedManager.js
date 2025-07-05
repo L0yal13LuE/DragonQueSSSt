@@ -198,7 +198,12 @@ const createItemDropEmbed = (message, selectedItem, itemAmount) => {
   return itemDropEmbed;
 };
 
-const createItemTransferEmbed = (receiver, selectedItem, itemAmount, sender) => {
+const createItemTransferEmbed = (
+  receiver,
+  selectedItem,
+  itemAmount,
+  sender
+) => {
   const itemDropEmbed = createBaseEmbed({
     color: 0xffd700,
     title: "✨ Item Transfered ✨",
@@ -229,6 +234,48 @@ const createDamageEmbed = (author, monsterName, damageDealt) => {
   );
 };
 
+const createLeaderboardValueEmbed = (
+  leaderboardEntries,
+  currentPage,
+  pageSize
+) => {
+  const formattedLeaderboard = leaderboardEntries
+    .map((entry, index) => {
+      // Format the value with commas for readability
+      return `\`${(currentPage - 1) * pageSize + 1 + index}.\` <@${
+        entry.id
+      }> - **${entry.value.toLocaleString()}** value`;
+    })
+    .join("\n");
+
+  return createBaseEmbed({
+    color: 0xffd700, // Crimson red for damage
+    title: "🏆 Material Value Leaderboard 🏆",
+    description: `✨ Here are the top adventurers by total material value! ✨\n\n${formattedLeaderboard}`,
+  }).setFooter({ text: "Value based on material rarity." });
+};
+
+const createLeaderboardMonsterKillEmbed = (
+  leaderboardEntries,
+  currentPage,
+  pageSize
+) => {
+  const formattedLeaderboard = leaderboardEntries
+    .map((entry, index) => {
+      return `\`${(currentPage - 1) * pageSize + 1 + index}.\` <@${
+        entry.id
+      }> - **${entry.value.toLocaleString()}** kills`;
+    })
+    .join("\n");
+
+  return createBaseEmbed({
+    color: 0x32cd32, // Lime green for monster kills
+    title: "⚔️ Monster Kill Leaderboard ⚔️",
+    description: `💀 Here are the top monster slayers! 💀\n\n${formattedLeaderboard}`,
+  }).setFooter({ text: "Total monsters slain by each user." });
+};
+
+
 module.exports = {
   createRankEmbed,
   createBagEmbed,
@@ -241,4 +288,6 @@ module.exports = {
   createDamageEmbed,
   createItemTransferEmbed,
   createBaseEmbed,
+  createLeaderboardValueEmbed,
+  createLeaderboardMonsterKillEmbed
 };
