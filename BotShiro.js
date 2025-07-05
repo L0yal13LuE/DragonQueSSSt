@@ -58,6 +58,11 @@ const {
   handleDonationListInteraction,
   handleDonateButtonClick
 } = require("./managers/clanDonationManager.js");
+const {
+  handleCraftListCommand,
+  handleCraftListInteraction,
+  handleCraftListButtonClick
+} = require("./managers/craftPaginationManager.js");
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -309,26 +314,27 @@ client.on("messageCreate", async (message) => {
         // somehow shop clan command is not valid -> try normal shop command
         if (shopWorkShopSettings) {
           await handleShopCommand(message, shopWorkShopSettings);
+          return;
         }
         break;
-      case "craft":
-        // find out if user typing this craft command in clan channel and craft command is valid
-        const craftInClan = clanCraftSettingData.find(
-          (row) => row.channel_id == message.channel.id
-        );
-        if (
-          craftInClan &&
-          craftInClan.setting &&
-          craftInClan.setting.items.length > 0
-        ) {
-          await handleCraftCommand(message, craftInClan.setting);
-        } else {
-          // somehow craft clan command is not valid -> try normal craft command
-          if (craftWorkShopSettings) {
-            await handleCraftCommand(message, craftWorkShopSettings);
-          }
-        }
-        break;
+      // case "craft": // old craft
+      //   // find out if user typing this craft command in clan channel and craft command is valid
+      //   const craftInClan = clanCraftSettingData.find(
+      //     (row) => row.channel_id == message.channel.id
+      //   );
+      //   if (
+      //     craftInClan &&
+      //     craftInClan.setting &&
+      //     craftInClan.setting.items.length > 0
+      //   ) {
+      //     await handleCraftCommand(message, craftInClan.setting);
+      //   } else {
+      //     // somehow craft clan command is not valid -> try normal craft command
+      //     if (craftWorkShopSettings) {
+      //       await handleCraftCommand(message, craftWorkShopSettings);
+      //     }
+      //   }
+      //   break;
       // case 'chat': // useless ?
       //     commandHandlers.handleChatCommand(message, args);
       //     break;
@@ -368,6 +374,18 @@ client.on("messageCreate", async (message) => {
           await handleDonationListCommand(message, clanNumber);
         } else {
           message.reply("You must be in clan channel to use this command.");
+        }
+        break;
+      case 'craft': // new craft with pagination
+        const craftInClanB = clanCraftSettingData.find( (row) => row.channel_id == message.channel.id );
+        if (craftInClanB && craftInClanB.setting && craftInClanB.setting.items.length > 0) {
+          // in clan
+          await handleCraftListCommand(message, craftInClanB.setting)
+          return;
+        } else {
+          // in normal
+          if (craftWorkShopSettings) await handleCraftListCommand(message, craftWorkShopSettings) 
+          else message.reply(`Craft command is not available right now.`);
         }
         break;
       // Add other commands here with their respective 'case' and 'break;'
@@ -498,6 +516,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
     ) {
       console.log("[Donate] Click Button : ", interaction.customId);
       await handleDonateButtonClick(interaction, clanShopSettingData, clanCraftSettingData);
+      return;
+    }
+    // craft list navigation button
+    if (interaction.isButton() &&
+      interaction.customId.startsWith("craftlist_nav_")) {
+      await handleCraftListInteraction(interaction, clanShopSettingData, clanCraftSettingData);
+      return;
+    }
+    // craft item button
+    if (interaction.isButton() &&
+      interaction.customId.startsWith("crafitem_")) {
+      await handleCraftListButtonClick(interaction, clanShopSettingData, clanCraftSettingData);
       return;
     }
   } catch (error) {

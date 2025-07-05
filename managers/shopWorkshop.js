@@ -224,6 +224,36 @@ const craftSettings = async (command, client) => {
     }
 };
 
+const filterChanceOfRarity = (materials, chanceToShowInPercent) => {
+ const cardList = [
+    'FCO-A',
+    'FCO-B',
+    'FCO-C',
+    'FCO-D',
+    'FCO-E',
+    'DCO-A',
+    'DCO-B',
+    'DCO-C',
+    'DCO-D',
+    'DCO-E',
+    'SCO-A',
+    'SCO-B',
+    'SCO-C',
+    'SCO-D',
+    'SCO-E',
+    'PCO'
+ ]
+ // filter material thats not in card list and use random chance in percent to show
+ const filtered =  materials.filter((material) => {
+    return !cardList.includes(material.name) && (Math.floor(Math.random() * 100) <= chanceToShowInPercent);
+  });
+  if (filtered.length > 1) {
+    return [filtered[0]]; // only return 1 item
+  } else {
+    return [];
+  }
+}
+
 const getShopMaterialsForSell = async () => {
     const date = new Date();
     const today = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
@@ -241,12 +271,14 @@ const getShopMaterialsForSell = async () => {
         const { data: rarity1Data, error: rarity1Error } = await supabase.rpc('get_materials_by_rarity_1');
         const { data: rarity2Data, error: rarity2Error } = await supabase.rpc('get_materials_by_rarity_2');
         const { data: rarity3Data, error: rarity3Error } = await supabase.rpc('get_materials_by_rarity_3');
+        const { data: rarity4Data, error: rarity4Error } = await supabase.rpc('get_materials_by_rarity_4');
 
+        const rarity4Filtered = rarity4Data.length > 0 ? filterChanceOfRarity(rarity4Data, 20) : []
         let combinedResults = [];
         if (rarity1Error || rarity2Error || rarity3Error) {
             console.error('Error fetching materials:', rarity1Error || rarity2Error || rarity3Error);
         } else {
-            combinedResults = [...rarity1Data, ...rarity2Data, ...rarity3Data];
+            combinedResults = [...rarity1Data, ...rarity2Data, ...rarity3Data, ...rarity4Filtered];
         }
 
         const buildPrice = (rarity_id) => {
@@ -257,8 +289,10 @@ const getShopMaterialsForSell = async () => {
                     return 7;
                 case 3:
                     return 12;
+                case 4:
+                    return 96;
                 default:
-                    return 12;
+                    return 36;
             }
         };
 

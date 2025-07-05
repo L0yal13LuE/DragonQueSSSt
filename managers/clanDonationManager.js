@@ -367,29 +367,28 @@ const handleDonateButtonClick = async (interaction, clanShopSettingData, clanCra
         const itemToDonateA = interaction.customId.replace(buttonPrefix, '').replace(/_/g, '');
         const itemToDonatePrefix = itemToDonateA.split('@')[0] || false;
         if (!itemToDonatePrefix) {
-            await interaction.editReply('Error: Could not identify the item you wish to donate.');
+            await interaction.followUp('Error: Could not identify the item you wish to donate.(1)\nPlease report this issue with screenshots to moderators or post it on the report channel.');
             return;
         }
 
         const itemtoDonateID = itemToDonatePrefix.split('-')[0] || false;
         const clanNumber = itemToDonatePrefix.split('-')[1] || false;
         if (!itemtoDonateID || !clanNumber) {
-            await interaction.editReply('Error: Could not identify the item you wish to donate.');
+            await interaction.followUp('Error: Could not identify the item you wish to donate.(2)\nPlease report this issue with screenshots to moderators or post it on the report channel.');
             return;
         }
 
         const userItem = await getUserItem({ userId, itemId: itemtoDonateID });
         const userItemMatch = userItem?.[0];
-
         if (!userItemMatch) {
-            await interaction.editReply(`You don't have that item to donate.`);
+            await interaction.followUp(`You don't have that item to donate.`);
             return;
         }
 
-        const { amount: amountOwned } = userItemMatch;
+        const { amount: amountOwned, material: materialOwned } = userItemMatch;
         const amountNew = amountOwned - 1;
         if (amountNew < 0) {
-            await interaction.editReply(`You don't have that item to donate.`);
+            await interaction.followUp(`You don't have **${materialOwned.name}** to donate.`);
             return;
         }
 
@@ -397,7 +396,7 @@ const handleDonateButtonClick = async (interaction, clanShopSettingData, clanCra
         const userUpdObj = { id: userId, username: username };
         const resultUpdate = await updateUserItem(userUpdObj, userItemMatch, amountNew);
         if (!resultUpdate) {
-            await interaction.editReply('Error: Could not update your item amount.');
+            await interaction.followUp('Error: Could not update your item amount.(3)\nPlease report this issue with screenshots to moderators or post it on the report channel.');
             return;
         }
 
@@ -406,9 +405,9 @@ const handleDonateButtonClick = async (interaction, clanShopSettingData, clanCra
         // 2. increase donation amount
         const donationItem = await makeDonation(clanNumber, userId, itemtoDonateID);
         if (donationItem) {
-            await interaction.editReply('Successfully donated the item.');
+            await interaction.followUp(`Successfully donated **${materialOwned.name}** x1 to clan No.${clanNumber}.`);
         } else {
-            await interaction.editReply('Error: Could not donate the item.');
+            await interaction.followUp('Error: Could not donate the item.(4)\nPlease report this issue with screenshots to moderators or post it on the report channel.');
         }
     }
 };
