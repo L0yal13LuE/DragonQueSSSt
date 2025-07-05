@@ -1,16 +1,20 @@
 const { REST, Routes, SlashCommandBuilder } = require("discord.js");
-require('dotenv').config({
-    path: {
-        blue: '.env.blue',
-        development: '.env',
-        staging: '.env.staging',
-        production: '.env.production'
-    }[process.env.NODE_ENV || 'development']
+require("dotenv").config({
+  path: {
+    blue: ".env.blue",
+    development: ".env",
+    staging: ".env.staging",
+    production: ".env.production",
+  }[process.env.NODE_ENV || "development"],
 });
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.CLIENT_ID;
-const guildId = process.env.GUID_ID;
+const guildId = process.env.GUILD_ID;
+
+console.log(token);
+console.log(clientId);
+console.log(guildId);
 
 const commands = [
   new SlashCommandBuilder()
@@ -34,6 +38,19 @@ const commands = [
         .setName("amount")
         .setDescription("Amount to send")
         .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("leaderboard")
+    .setDescription("Show the leaderboard of adventurers")
+    .addStringOption((option) =>
+      option
+        .setName("type")
+        .setDescription("leaderboard type")
+        .setRequired(true)
+        .addChoices(
+          { name: "Value", value: "value" },
+          { name: "Monster Kills", value: "monster_kills" }
+        )
     ),
 ].map((cmd) => cmd.toJSON());
 

@@ -25,11 +25,11 @@ const cacheManager = require("./managers/cacheManager");
 
 // --- Command Handlers ---
 const { handleMaterialCommand } = require("./managers/materialManager.js");
-
-// -- Addition Command Handlers ---
 const {
   handleLeaderboardCommand,
-} = require("./managers/leaderBoardManager.js");
+  handleLeaderboardPagination,
+} = require("./managers/leaderboard/leaderBoardValueManager.js");
+
 const {
   shopSettings,
   craftSettings,
@@ -290,9 +290,10 @@ client.on("messageCreate", async (message) => {
       case "level":
         commandHandlers.handleRankCommand(message);
         break;
-      // case 'leaderboard': // TODO: still need to be implemented more
-      //     handleLeaderboardCommand(message, client);
-      //     break;
+      case "leaderboard": // TODO: still need to be implemented more
+        //     handleLeaderboardCommand(message, client);
+        calculateLeaderboard(message, client);
+        break;
       case "shop":
         // check if message channel id matching clan shop settiings channel ids
         if (clanShopSettingData.has(message.channel.id)) {
@@ -455,13 +456,38 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       return;
     }
+
+    if (interaction.isButton()) {
+      if (
+        interaction.customId.startsWith(
+          `${CONSTANTS.CACHE_LEADERBOARD_VALUE_PREFIX}-nav`
+        )
+      ) {
+        await handleLeaderboardPagination(
+          interaction,
+          CONSTANTS.CACHE_LEADERBOARD_VALUE_PREFIX
+        );
+        return;
+      } else if (
+        interaction.customId.startsWith(
+          `${CONSTANTS.CACHE_LEADERBOARD_MONSTER_KILL_PREFIX}-nav`
+        )
+      ) {
+        await handleLeaderboardPagination(
+          interaction,
+          CONSTANTS.CACHE_LEADERBOARD_MONSTER_KILL_PREFIX
+        );
+      } else if (interaction.customId.startsWith("bag_nav_")) {
+        // bag navigation button interaction received
+        await handleBagPaginationInteraction(interaction);
+        return;
+      }
+    }
     if (interaction.commandName === "send") {
       await handleSendCommand(interaction);
       return;
-    }
-    if (interaction.isButton() && interaction.customId.startsWith("bag_nav_")) {
-      // bag navigation button interaction received
-      await handleBagPaginationInteraction(interaction);
+    } else if (interaction.commandName === "leaderboard") {
+      await handleLeaderboardCommand(interaction);
       return;
     }
   } catch (error) {
