@@ -8,7 +8,6 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags
 // const { createBaseEmbed } = require("./embedManager"); // Uncomment if you have a specific base embed for bags
 const { supabase } = require('../supabaseClient');
 const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/materialProvider");
-const { createCanvas, loadImage } = require('canvas');
 
 // --- Configuration ---
 const BAG_ITEMS_PER_PAGE = 10;
@@ -20,91 +19,6 @@ const BAG_INTERACTION_COOLDOWN_SECONDS = 5; // Cooldown for button clicks
 const craftListIntances = new Map();
 // Key: userId, Value: timestamp of when the cooldown ends
 const craftListInteractionCooldowns = new Map();
-
-async function generateCraftingTableImage(recipes) {
-    const MAX_MATERIALS = 10;
-    const PADDING = 15;
-
-    const COLOR_WHITE = '#FFFFFF';
-    const COLOR_BLACK = '#000000';
-
-    // --- ADJUSTMENTS HERE ---
-    const LINE_HEIGHT = 25; // Increased from 25 for bigger row gap
-    const FONT_SIZE = 14;   // Decreased from 18 for smaller text
-    const HEADER_FONT_SIZE = 16; // Decreased from 20 for smaller header text
-    // --- END ADJUSTMENTS ---
-
-    // --- Calculate dynamic column widths (logic unchanged, but will scale with new FONT_SIZE) ---
-    let maxItemNameLength = 'Crafted Item'.length;
-    const materialColumnWidths = Array(MAX_MATERIALS).fill(0).map((_, i) => `Material ${i + 1}`.length);
-
-    recipes.forEach(recipe => {
-        if (recipe.item.length > maxItemNameLength) {
-            maxItemNameLength = recipe.item.length;
-        }
-        recipe.materials.forEach((mat, index) => {
-            if (index < MAX_MATERIALS && mat.length > materialColumnWidths[index]) {
-                materialColumnWidths[index] = mat.length;
-            }
-        });
-    });
-
-    // Adjust CHAR_WIDTH_FACTOR if necessary for precise alignment with new font size
-    const CHAR_WIDTH_FACTOR = 9; // Might need fine-tuning for 16px font
-    const ITEM_COL_WIDTH = maxItemNameLength * CHAR_WIDTH_FACTOR + PADDING * 2;
-    const MATERIAL_COL_WIDTHS = materialColumnWidths.map(len => len * CHAR_WIDTH_FACTOR + PADDING * 2);
-
-    const TABLE_WIDTH = ITEM_COL_WIDTH + MATERIAL_COL_WIDTHS.reduce((sum, w) => sum + w, 0);
-    const TABLE_HEIGHT = (recipes.length + 1) * LINE_HEIGHT + PADDING * 2;
-
-    const canvas = createCanvas(TABLE_WIDTH, TABLE_HEIGHT);
-    const ctx = canvas.getContext('2d');
-
-    // --- Drawing logic (mostly unchanged, but uses new constants) ---
-    ctx.fillStyle = COLOR_WHITE; // bg color
-    ctx.fillRect(0, 0, TABLE_WIDTH, TABLE_HEIGHT);
-
-    ctx.fillStyle = COLOR_BLACK; // font color
-    ctx.font = `${HEADER_FONT_SIZE}px sans-serif`;
-    let currentX = PADDING;
-    let currentY = PADDING + HEADER_FONT_SIZE;
-
-    ctx.fillText('Crafted Item', currentX, currentY);
-    currentX += ITEM_COL_WIDTH;
-
-    for (let i = 0; i < MAX_MATERIALS; i++) {
-        ctx.fillText(`Material ${i + 1}`, currentX, currentY);
-        currentX += MATERIAL_COL_WIDTHS[i];
-    }
-
-    ctx.strokeStyle = '#5865F2'; // table line color
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, currentY + PADDING / 2);
-    ctx.lineTo(TABLE_WIDTH, currentY + PADDING / 2);
-    ctx.stroke();
-
-    currentY += LINE_HEIGHT + PADDING / 2;
-
-    ctx.font = `${FONT_SIZE}px sans-serif`;
-    recipes.forEach(recipe => {
-        currentX = PADDING;
-        ctx.fillStyle = COLOR_BLACK; // font color 
-
-        ctx.fillText(recipe.item, currentX, currentY);
-        currentX += ITEM_COL_WIDTH;
-
-        for (let i = 0; i < MAX_MATERIALS; i++) {
-            const material = recipe.materials[i] || '';
-            ctx.fillText(material, currentX, currentY);
-            currentX += MATERIAL_COL_WIDTHS[i];
-        }
-        currentY += LINE_HEIGHT;
-    });
-
-    return canvas.toBuffer('image/png');
-}
-
 
 
 /**
