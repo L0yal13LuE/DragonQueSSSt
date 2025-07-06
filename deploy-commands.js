@@ -12,9 +12,9 @@ const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.CLIENT_ID;
 const guildId = process.env.GUILD_ID;
 
-console.log(token);
-console.log(clientId);
-console.log(guildId);
+console.log(`token: ${token}`);
+console.log(`clientId: ${clientId}`);
+console.log(`guildId: ${guildId}`);
 
 const commands = [
   new SlashCommandBuilder()
@@ -67,3 +67,5 @@ const rest = new REST({ version: "10" }).setToken(token);
     console.error(error);
   }
 })();
+
+// $env:NODE_ENV="blue"; node deploy-commands.js // run command

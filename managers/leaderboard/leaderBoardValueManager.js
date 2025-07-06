@@ -25,6 +25,7 @@ const handleLeaderboardPagination = async (interaction, prefix) => {
   const userId = interaction.user.id;
   const now = Date.now();
 
+  // Step 1 Verify custom ID
   const parts = interaction.customId.split("-");
   if (parts.length < 4) {
     console.warn(
