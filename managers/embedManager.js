@@ -74,8 +74,8 @@ const createMonsterStatusEmbed = (
     { name: "Name", value: monsterData.name, inline: true },
     { name: "Status", value: `**${status}**`, inline: true },
     {
-      name: "Health (HP)",
-      value: `${remainingHpText} / ${monsterData.max_hp}`,
+      name: "HP",
+      value: `${remainingHpText}`,
       inline: true,
     }
   );
@@ -89,7 +89,7 @@ const createMonsterStatusEmbed = (
   }
   if (!monsterData.is_alive && monsterData.killed_at_timestamp) {
     embed.addFields({
-      name: "Time Defeated",
+      name: "Defeated At",
       value: `<t:${Math.floor(
         new Date(monsterData.killed_at_timestamp).getTime() / 1000
       )}:R>`,

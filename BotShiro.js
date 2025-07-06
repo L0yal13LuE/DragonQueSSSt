@@ -28,7 +28,7 @@ const { handleMaterialCommand } = require("./managers/materialManager.js");
 const {
   handleLeaderboardCommand,
   handleLeaderboardPagination,
-} = require("./managers/leaderboard/leaderBoardValueManager.js");
+} = require("./managers/leaderboard/leaderboardManager.js");
 
 const {
   shopSettings,
@@ -299,10 +299,6 @@ client.on("messageCreate", async (message) => {
       case "level":
         commandHandlers.handleRankCommand(message);
         break;
-      case "leaderboard": // TODO: still need to be implemented more
-        //     handleLeaderboardCommand(message, client);
-        calculateLeaderboard(message, client);
-        break;
       case "shop":
         // check if message channel id matching clan shop settiings channel ids
         if (clanShopSettingData.has(message.channel.id)) {
@@ -349,15 +345,6 @@ client.on("messageCreate", async (message) => {
       case "bagdm":
       case "bag_dm":
         await commandHandlers.handleBagPaginationCommand(message, true);
-        break;
-      case "monster":
-        commandHandlers.handleMonsterCommand(
-          message,
-          currentMonsterStateRef.current
-        ); // Pass current state
-        break;
-      case "material":
-        handleMaterialCommand(message); // Keep using the imported manager
         break;
       case "donate":
       case "donation":
@@ -579,6 +566,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } else if (interaction.commandName === "leaderboard") {
       await handleLeaderboardCommand(interaction);
       return;
+    }
+
+    switch(interaction.commandName)
+    {
+      case "droprate":
+        await handleMaterialCommand(interaction);
+        break;
+      case "send":         
+        await handleSendCommand(interaction); // Keep using the imported manager
+        break;
+      case "leaderboard":         
+        await handleLeaderboardCommand(interaction); // Keep using the imported manager
+        break;
+      case "monster-status":
+        await commandHandlers.handleMonsterCommandV2(interaction, currentMonsterStateRef.current); // Keep using the imported manager
+        break;
     }
   } catch (error) {
     console.error("Events.InteractionCreate : Failed!", error);

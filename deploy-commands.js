@@ -52,6 +52,12 @@ const commands = [
           { name: "Monster Kills", value: "monster_kills" }
         )
     ),
+  new SlashCommandBuilder()
+    .setName("droprate")
+    .setDescription("Shows the drop rates for materials in the current channel."),
+  new SlashCommandBuilder()
+    .setName("monster-status")
+    .setDescription("Shows the status of today's monster."),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(token);
