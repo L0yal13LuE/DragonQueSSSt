@@ -16,7 +16,12 @@ const fetchWithCache = async ({
   filters = {},
 }) => {
   try {
-    const cachedResult = await getCachedData(cacheKey);
+    let directoryPath = null;
+    if(cacheKey == CONSTANTS.CACHE_MATERIAL_CHANNEL_PREFIX) directoryPath = 'MASTER';
+    if(cacheKey == CONSTANTS.CACHE_CHANNEL_PREFIX) directoryPath = 'MASTER';
+    if(cacheKey == CONSTANTS.CACHE_RARITIES_PREFIX) directoryPath = 'MASTER';
+
+    const cachedResult = await getCachedData(cacheKey, directoryPath);
 
     if (cachedResult) {
       return cachedResult;
@@ -28,7 +33,7 @@ const fetchWithCache = async ({
       return false;
     }
 
-    saveCachedData(cacheKey, result, ttl);
+    saveCachedData(cacheKey, result, ttl, directoryPath);
 
     return result;
   } catch (error) {

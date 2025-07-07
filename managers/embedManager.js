@@ -178,7 +178,6 @@ const createMonsterDefeatEmbed = (monsterData) => {
 };
 
 // --- Game Logic Embeds ---
-
 const createItemDropEmbed = (message, selectedItem, itemAmount) => {
   const itemDropEmbed = createBaseEmbed({
     color: 0xffd700,
@@ -234,7 +233,8 @@ const createDamageEmbed = (author, monsterName, damageDealt) => {
   );
 };
 
-const createLeaderboardValueEmbed = (
+// --- Leaderboard Embeds ---
+const createLeaderboardPointEmbed = (
   leaderboardEntries,
   currentPage,
   pageSize
@@ -250,9 +250,9 @@ const createLeaderboardValueEmbed = (
 
   return createBaseEmbed({
     color: 0xffd700, // Crimson red for damage
-    title: "🏆 Material Value Leaderboard 🏆",
-    description: `✨ Here are the top adventurers by total material value! ✨\n\n${formattedLeaderboard}`,
-  }).setFooter({ text: "Value based on material rarity." });
+    title: "🏆 Material Points Leaderboard 🏆",
+    description: `✨ Here are the top adventurers by total material points! ✨\n\n${formattedLeaderboard}`,
+  }).setFooter({ text: "Points based on material rarity." });
 };
 
 const createLeaderboardMonsterKillEmbed = (
@@ -269,7 +269,7 @@ const createLeaderboardMonsterKillEmbed = (
     .join("\n");
 
   return createBaseEmbed({
-    color: 0x32cd32, // Lime green for monster kills
+    color: 0xdc143c, // Crimson red
     title: "⚔️ Monster Kill Leaderboard ⚔️",
     description: `💀 Here are the top monster slayers! 💀\n\n${formattedLeaderboard}`,
   }).setFooter({ text: "Total monsters slain by each user." });
@@ -288,6 +288,6 @@ module.exports = {
   createDamageEmbed,
   createItemTransferEmbed,
   createBaseEmbed,
-  createLeaderboardValueEmbed,
+  createLeaderboardPointEmbed,
   createLeaderboardMonsterKillEmbed
 };

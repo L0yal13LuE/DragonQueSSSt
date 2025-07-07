@@ -141,87 +141,7 @@ const handleBagCommand = async (message) => {
   }
 };
 
-/**
- * Handles the '!monster' command to show today's monster status.
- */
-const handleMonsterCommand = async (message, currentMonsterState) => {
-  if (!supabase) {
-    message.reply("Database issue! Can't check monster status. 😥");
-    return;
-  }
-  const today = getTodaysDateString();
-  console.log(
-    `[${message.author.username}] Requested monster status for ${today}.`
-  );
-  try {
-    // Use cached state if available and for today, otherwise fetch
-    let monsterData =
-      currentMonsterState && currentMonsterState.spawn_date === today
-        ? currentMonsterState
-        : await getMonsterForDate(today);
-
-    if (monsterData) {
-      let status = monsterData.is_alive ? "⚔️" : "☠️";
-      let color = monsterData.is_alive ? 0xff4500 : 0x32cd32; // Orange if alive, Green if dead
-      let remainingHpText = "0";
-      if (monsterData.is_alive) {
-        const totalDamage = await getTotalDamageDealt(today);
-        const remainingHp = Math.max(0, monsterData.max_hp - totalDamage);
-        remainingHpText = remainingHp.toString();
-        if (remainingHp <= 0) {
-          status = "☠️ (Update Pending)"; // Indicate defeat is imminent or pending update
-          color = 0x32cd32; // Show green if HP is 0 or less
-        }
-      }
-
-      let latestHpRow = `${remainingHpText} / ${monsterData.max_hp}`;
-      if (parseInt(remainingHpText) < parseInt(monsterData.max_hp) * 0.2)
-        latestHpRow = "Low"; // hp less than 20%
-      if (parseInt(remainingHpText) < parseInt(monsterData.max_hp) * 0.1)
-        latestHpRow = "Very Low"; // hp less than 10%
-
-      const monsterEmbed = new EmbedBuilder()
-        .setColor(color)
-        .setTitle(`👽 Today's Monster Status (${today}) 🦑`)
-        .addFields(
-          { name: "Name", value: monsterData.name, inline: true },
-          { name: "Status", value: `**${status}**`, inline: true },
-          {
-            name: "HP",
-            value: latestHpRow,
-            inline: true,
-          }
-        )
-        .setTimestamp();
-
-      if (!monsterData.is_alive && monsterData.killed_by_user_id) {
-        monsterEmbed.addFields({
-          name: "Defeated By",
-          value: `<@${monsterData.killed_by_user_id}>`,
-          inline: true,
-        });
-      }
-      if (!monsterData.is_alive && monsterData.killed_at_timestamp) {
-        monsterEmbed.addFields({
-          name: "Defeated At",
-          value: `<t:${Math.floor(
-            new Date(monsterData.killed_at_timestamp).getTime() / 1000
-          )}:R>`,
-          inline: true,
-        });
-      }
-      message.reply({ embeds: [monsterEmbed] });
-    } else {
-      message.reply(`No monster spawned today (${today})! 😴`);
-      console.log(`No monster found for ${today} via !monster command.`);
-    }
-  } catch (error) {
-    console.error("Error during monster command:", error);
-    message.reply("Oops! Error checking monster status. Try again.");
-  }
-};
-
-const handleMonsterCommandV2 = async (interaction, currentMonsterState) => {
+const handleMonsterCommand = async (interaction, currentMonsterState) => {
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply();
   }
@@ -449,6 +369,5 @@ module.exports = {
   handleChatCommand,
   handleBagCommand,
   handleMonsterCommand,
-  handleMonsterCommandV2,
   handleBagPaginationCommand,
 };

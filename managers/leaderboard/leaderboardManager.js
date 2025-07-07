@@ -5,7 +5,7 @@ const {
   MessageFlags,
 } = require("discord.js");
 const {
-  createLeaderboardValueEmbed,
+  createLeaderboardPointEmbed,
   createLeaderboardMonsterKillEmbed,
 } = require("../embedManager");
 const CONSTANTS = require("../../constants");
@@ -19,7 +19,7 @@ const { getEventMonsters } = require("../../providers/monsterProvider");
 
 const LEADERBOARD_MEMBER_PER_PAGE = 10;
 
-const handleLeaderboardPagination = async (interaction, prefix) => {
+const handlePaging = async (interaction, prefix, embededFn) => {
   const userId = interaction.user.id;
 
   // Step 1: Defer the interaction
@@ -47,7 +47,7 @@ const handleLeaderboardPagination = async (interaction, prefix) => {
 
   // Step 3: Verify cache if expired already
   const leaderboardValueKey = `${prefix}-${parts[3]}`;
-  const leaderboardCache = await getCachedData(leaderboardValueKey);
+  const leaderboardCache = await getCachedData(leaderboardValueKey, prefix);
   if (!leaderboardCache) {
     await interaction.followUp({
       content: `This command is out of date. Please use the command again.`,
@@ -93,7 +93,7 @@ const handleLeaderboardPagination = async (interaction, prefix) => {
 
   // Step 7: Create embeded
   try {
-    const updatedEmbed = createLeaderboardValueEmbed(
+    const updatedEmbed = embededFn(
       leaderboardResult.data,
       newPage,
       LEADERBOARD_MEMBER_PER_PAGE
@@ -120,14 +120,18 @@ const handleLeaderboardPagination = async (interaction, prefix) => {
     );
     leaderboardCache.currentPage = newPage;
 
-    const jsonCache = {
-      commander: leaderboardCache.commander,
-      data: leaderboardCache.data,
-      currentPage: leaderboardCache.currentPage,
-      total: leaderboardCache.total,
-      message: replyMessage,
-    };
-    saveCachedData(leaderboardValueKey, jsonCache, 0);
+    saveCachedData(
+      leaderboardValueKey,
+      {
+        commander: leaderboardCache.commander,
+        data: leaderboardCache.data,
+        currentPage: leaderboardCache.currentPage,
+        total: leaderboardCache.total,
+        message: replyMessage,
+      },
+      0,
+      prefix
+    );
   } catch (error) {
     console.error(
       `Error on editReply for ${prefix} pagination for ${userId} (page ${currentPage}): ${error.message}`
@@ -217,20 +221,20 @@ const handleLeaderboardInteraction = async (
   // Step 8: Save cache
   const leaderboardValueKey = `${prefix}-${replyMessage.id}`;
 
-  const jsonCache = {
-    commander: {
-      id: interactUser.id,
-      username: interactUser.username,
-    },
-    data: dataOriginal,
-    currentPage: startingPage,
-    total: dataOriginal.length,
-    message: replyMessage,
-  };
   saveCachedData(
     leaderboardValueKey,
-    jsonCache,
-    CONSTANTS.CACHE_LEADERBOARD_VALUE_TTL_MS
+    {
+      commander: {
+        id: interactUser.id,
+        username: interactUser.username,
+      },
+      data: dataOriginal,
+      currentPage: startingPage,
+      total: dataOriginal.length,
+      message: replyMessage,
+    },
+    CONSTANTS.CACHE_LEADERBOARD_VALUE_TTL_MS,
+    prefix
   );
 
   console.log(`[${interaction.user.username}] Replied with the leaderboard.`);
@@ -341,15 +345,32 @@ const createPaginationButtons = (
   );
 };
 
+const handleLeaderboardPagination = async (interaction, prefix) => {
+  switch (prefix) {
+    case CONSTANTS.CACHE_LEADERBOARD_POINT_PREFIX:
+      await handlePaging(interaction, prefix, createLeaderboardPointEmbed);
+      break;
+    case CONSTANTS.CACHE_LEADERBOARD_MONSTER_KILL_PREFIX:
+      await handlePaging(
+        interaction,
+        prefix,
+        createLeaderboardMonsterKillEmbed
+      );
+      break;
+    default:
+      break;
+  }
+};
+
 const handleLeaderboardCommand = async (interaction) => {
   const focusedOption = interaction.options.getString("type");
   switch (focusedOption) {
-    case "value":
+    case "points":
       await handleLeaderboardInteraction(
         interaction,
-        CONSTANTS.CACHE_LEADERBOARD_VALUE_PREFIX,
+        CONSTANTS.CACHE_LEADERBOARD_POINT_PREFIX,
         calculateValueLeaderboard,
-        createLeaderboardValueEmbed
+        createLeaderboardPointEmbed
       );
       break;
     case "monster_kills":

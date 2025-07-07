@@ -48,7 +48,7 @@ const commands = [
         .setDescription("leaderboard type")
         .setRequired(true)
         .addChoices(
-          { name: "Value", value: "value" },
+          { name: "Material Points", value: "points" },
           { name: "Monster Kills", value: "monster_kills" }
         )
     ),

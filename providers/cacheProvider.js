@@ -5,12 +5,14 @@ const CACHE_DIR = "./cache";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Generates the file path for a given cache key.
+ * Generates the file path for a given cache key, optionally within a specific layer (subdirectory).
  * @param {string} key - The unique key for the cache entry (e.g., "bag_userId", "shop_data").
+ * @param {string} [layerKey] - Optional layer or subdirectory name for additional cache separation.
  * @returns {string} The full file path for the cache file.
  */
-const getCacheFilePath = (key) => {
-  return path.join(CACHE_DIR, `${key}.json`);
+const getCacheFilePath = (key, layerKey) => {
+  const baseDir = layerKey ? path.join(CACHE_DIR, layerKey) : CACHE_DIR;
+  return path.join(baseDir, `${key}.json`);
 };
 
 /**
@@ -18,8 +20,8 @@ const getCacheFilePath = (key) => {
  * @param {string} key - The unique key for the cache entry.
  * @returns {Promise<any|null>} The parsed JSON data or null if not found or expired.
  */
-const getCachedData = async (key) => {
-  const filePath = getCacheFilePath(key);
+const getCachedData = async (key, layerKey) => {
+  const filePath = getCacheFilePath(key, layerKey);
 
   if (!fs.existsSync(filePath)) return null;
 
@@ -71,23 +73,29 @@ const getCachedData = async (key) => {
 };
 
 /**
- * Saves data to the cache with a given key.
+ * Saves data to the cache with a given key, optionally within a specific layer (subdirectory).
  * @param {string} key - The unique key for the cache entry.
  * @param {any} data - The data to be cached (will be JSON.stringified).
  * @param {number} [ttlMs] - Optional Time-To-Live in milliseconds for this specific cache entry.
+ * @param {string} [layerKey] - Optional layer or subdirectory name for additional cache separation.
  */
-const saveCachedData = (key, data, ttlMs) => {
-  if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
+const saveCachedData = (key, data, ttlMs, layerKey) => {
+  const layerDir = layerKey ? path.join(CACHE_DIR, layerKey) : CACHE_DIR;
+
+  if (!fs.existsSync(layerDir)) {
+    fs.mkdirSync(layerDir, { recursive: true });
   }
-  const filePath = getCacheFilePath(key);
+
+  const filePath = path.join(layerDir, `${key}.json`);
   const effectiveTtl = ttlMs || CACHE_TTL_MS;
+
   const cacheEntry = {
     data: data,
     expiresAt: Date.now() + effectiveTtl,
   };
+
   fs.writeFileSync(filePath, JSON.stringify(cacheEntry, null, 2));
-  console.log(`[Cache] Data saved for key: ${key}`);
+  console.log(`[Cache] Data saved for key: ${key}${layerKey ? ` in layer: ${layerKey}` : ""}`);
 };
 
 const deleteCachedData = async (key) => {
@@ -99,8 +107,6 @@ const deleteCachedData = async (key) => {
   }
   return false;
 };
-
-
 
 module.exports = {
   getCachedData,

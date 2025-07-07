@@ -467,11 +467,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // Button Case
     const buttonHandlers = [
       {
-        prefix: CONSTANTS.CACHE_LEADERBOARD_VALUE_PREFIX,
+        prefix: CONSTANTS.CACHE_LEADERBOARD_POINT_PREFIX,
         handler: (i) =>
           handleLeaderboardPagination(
             i,
-            CONSTANTS.CACHE_LEADERBOARD_VALUE_PREFIX
+            CONSTANTS.CACHE_LEADERBOARD_POINT_PREFIX
           ),
       },
       {
@@ -560,14 +560,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     // Submit case
-    if (interaction.commandName === "send") {
-      await handleSendCommand(interaction);
-      return;
-    } else if (interaction.commandName === "leaderboard") {
-      await handleLeaderboardCommand(interaction);
-      return;
-    }
-
     switch(interaction.commandName)
     {
       case "droprate":
@@ -580,7 +572,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handleLeaderboardCommand(interaction); // Keep using the imported manager
         break;
       case "monster-status":
-        await commandHandlers.handleMonsterCommandV2(interaction, currentMonsterStateRef.current); // Keep using the imported manager
+        await commandHandlers.handleMonsterCommand(interaction, currentMonsterStateRef.current); // Keep using the imported manager
         break;
     }
   } catch (error) {
