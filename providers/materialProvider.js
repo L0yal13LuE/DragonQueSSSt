@@ -99,11 +99,16 @@ const getUserItem = async (filters = {}) => {
     let query = supabase
       .from("user_material")
       .select(
-        "id, amount, material:materials(id, name, emoji, rarity_id, rarities(id, name, emoji, drop_rate))"
+        "id, user_id, amount, material:materials(id, name, emoji, rarity_id, rarities(id, name, emoji, drop_rate, value))"
       );
 
     if ("userId" in filters) {
       query = query.eq("user_id", filters.userId);
+    }
+
+    if("userIdList" in filters)
+    {
+      query = query.in("user_id", filters.userIdList);
     }
 
     if ("itemId" in filters) {

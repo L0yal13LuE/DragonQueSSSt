@@ -25,11 +25,11 @@ const cacheManager = require("./managers/cacheManager");
 
 // --- Command Handlers ---
 const { handleMaterialCommand } = require("./managers/materialManager.js");
-
-// -- Addition Command Handlers ---
 const {
   handleLeaderboardCommand,
-} = require("./managers/leaderBoardManager.js");
+  handleLeaderboardPagination,
+} = require("./managers/leaderboard/leaderboardManager.js");
+
 const {
   shopSettings,
   craftSettings,
@@ -56,12 +56,12 @@ const {
 const {
   handleDonationListCommand,
   handleDonationListInteraction,
-  handleDonateButtonClick
+  handleDonateButtonClick,
 } = require("./managers/clanDonationManager.js");
 const {
   handleCraftListCommand,
   handleCraftListInteraction,
-  handleCraftListButtonClick
+  handleCraftListButtonClick,
 } = require("./managers/craftPaginationManager.js");
 
 // --- Configuration ---
@@ -299,9 +299,6 @@ client.on("messageCreate", async (message) => {
       case "level":
         commandHandlers.handleRankCommand(message);
         break;
-      // case 'leaderboard': // TODO: still need to be implemented more
-      //     handleLeaderboardCommand(message, client);
-      //     break;
       case "shop":
         // check if message channel id matching clan shop settiings channel ids
         if (clanShopSettingData.has(message.channel.id)) {
@@ -349,15 +346,6 @@ client.on("messageCreate", async (message) => {
       case "bag_dm":
         await commandHandlers.handleBagPaginationCommand(message, true);
         break;
-      case "monster":
-        commandHandlers.handleMonsterCommand(
-          message,
-          currentMonsterStateRef.current
-        ); // Pass current state
-        break;
-      case "material":
-        handleMaterialCommand(message); // Keep using the imported manager
-        break;
       case "donate":
       case "donation":
         const channelClanNumber = clanShopSettingData.get(message.channel.id)?.clanNumber;
@@ -376,15 +364,22 @@ client.on("messageCreate", async (message) => {
           message.reply("You must be in clan channel to use this command.");
         }
         break;
-      case 'craft': // new craft with pagination
-        const craftInClanB = clanCraftSettingData.find( (row) => row.channel_id == message.channel.id );
-        if (craftInClanB && craftInClanB.setting && craftInClanB.setting.items.length > 0) {
+      case "craft": // new craft with pagination
+        const craftInClanB = clanCraftSettingData.find(
+          (row) => row.channel_id == message.channel.id
+        );
+        if (
+          craftInClanB &&
+          craftInClanB.setting &&
+          craftInClanB.setting.items.length > 0
+        ) {
           // in clan
-          await handleCraftListCommand(message, craftInClanB.setting)
+          await handleCraftListCommand(message, craftInClanB.setting);
           return;
         } else {
           // in normal
-          if (craftWorkShopSettings) await handleCraftListCommand(message, craftWorkShopSettings) 
+          if (craftWorkShopSettings)
+            await handleCraftListCommand(message, craftWorkShopSettings);
           else message.reply(`Craft command is not available right now.`);
         }
         break;
@@ -468,67 +463,117 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await handleShopSelectMenuClick(interaction, shopWorkShopSettings);
       return;
     }
-    if (
-      interaction.isButton() &&
-      interaction.customId.startsWith("craft_") &&
-      craftWorkShopSettings
-    ) {
-      console.log("[Craft] Click Button : ", interaction.customId);
-      await handleCraftButtonClick(interaction, craftWorkShopSettings);
-      return;
-    }
-    if (
-      interaction.isButton() &&
-      interaction.customId.startsWith("craftclan_")
-    ) {
-      const craftInClan = clanCraftSettingData.find(
-        (row) => row.channel_id == interaction.channelId
+
+    // Button Case
+    const buttonHandlers = [
+      {
+        prefix: CONSTANTS.CACHE_LEADERBOARD_POINT_PREFIX,
+        handler: (i) =>
+          handleLeaderboardPagination(
+            i,
+            CONSTANTS.CACHE_LEADERBOARD_POINT_PREFIX
+          ),
+      },
+      {
+        prefix: CONSTANTS.CACHE_LEADERBOARD_MONSTER_KILL_PREFIX,
+        handler: (i) =>
+          handleLeaderboardPagination(
+            i,
+            CONSTANTS.CACHE_LEADERBOARD_MONSTER_KILL_PREFIX
+          ),
+      },
+      {
+        prefix: "donationlist_nav_",
+        handler: (i) =>
+          handleDonationListInteraction(
+            i,
+            clanShopSettingData,
+            clanCraftSettingData
+          ),
+      },
+      {
+        prefix: "donationitem_",
+        handler: (i) => {
+          console.log("[Donate] Click Button:", i.customId);
+          return handleDonateButtonClick(
+            i,
+            clanShopSettingData,
+            clanCraftSettingData
+          );
+        },
+      },
+      {
+        prefix: "craft_",
+        handler: (i) => {
+          if (craftWorkShopSettings) {
+            console.log("[Craft] Click Button:", i.customId);
+            return handleCraftButtonClick(i, craftWorkShopSettings);
+          }
+        },
+      },
+      {
+        prefix: "craftclan_",
+        handler: (i) => {
+          if (!craftWorkShopSettings) return;
+          const craftInClan = clanCraftSettingData.find(
+            (row) => row.channel_id === i.channelId
+          );
+          if (craftInClan?.setting?.items?.length > 0) {
+            console.log("[CraftClan] Click Button:", i.customId);
+            return handleCraftButtonClick(i, craftInClan.setting);
+          }
+        },
+      },
+      {
+        prefix: "craftlist_nav_",
+        handler: (i) =>
+          handleCraftListInteraction(
+            i,
+            clanShopSettingData,
+            clanCraftSettingData
+          ),
+      },
+      {
+        prefix: "crafitem_",
+        handler: (i) =>
+          handleCraftListButtonClick(
+            i,
+            clanShopSettingData,
+            clanCraftSettingData
+          ),
+      },
+      {
+        prefix: "bag_nav_",
+        handler: (i) => handleBagPaginationInteraction(i),
+      },
+    ];
+
+    // Usage
+    if (interaction.isButton()) {
+      const matched = buttonHandlers.find((h) =>
+        interaction.customId.startsWith(h.prefix)
       );
-      if (
-        craftInClan &&
-        craftInClan.setting &&
-        craftInClan.setting.items.length > 0
-      ) {
-        console.log("[CraftClan] Click Button : ", interaction.customId);
-        await handleCraftButtonClick(interaction, craftInClan.setting);
-        return;
+      if (matched) {
+        await matched.handler(interaction);
       }
       return;
     }
-    if (interaction.commandName === "send") {
-      await handleSendCommand(interaction);
-      return;
-    }
-    if (interaction.isButton() && interaction.customId.startsWith("bag_nav_")) {
-      // bag navigation button interaction received
-      await handleBagPaginationInteraction(interaction);
-      return;
-    }
-    // donation list navigation button
-    if (interaction.isButton() &&
-      interaction.customId.startsWith("donationlist_nav_")) {
-      await handleDonationListInteraction(interaction, clanShopSettingData, clanCraftSettingData);
-      return;
-    }
-    // donation item button
-    if (interaction.isButton() &&
-      interaction.customId.startsWith("donationitem_")
-    ) {
-      console.log("[Donate] Click Button : ", interaction.customId);
-      await handleDonateButtonClick(interaction, clanShopSettingData, clanCraftSettingData);
-      return;
-    }
-    // craft list navigation button
-    if (interaction.isButton() &&
-      interaction.customId.startsWith("craftlist_nav_")) {
-      await handleCraftListInteraction(interaction, clanShopSettingData, clanCraftSettingData);
-      return;
-    }
-    // craft item button
-    if (interaction.isButton() &&
-      interaction.customId.startsWith("crafitem_")) {
-      await handleCraftListButtonClick(interaction, clanShopSettingData, clanCraftSettingData);
-      return;
+
+    // Submit case
+    switch(interaction.commandName)
+    {
+      case "droprate":
+        await handleMaterialCommand(interaction);
+        break;
+      case "send":         
+        await handleSendCommand(interaction); // Keep using the imported manager
+        break;
+      case "leaderboard":         
+        await handleLeaderboardCommand(interaction); // Keep using the imported manager
+        break;
+      case "monster-status":
+        await commandHandlers.handleMonsterCommand(interaction, currentMonsterStateRef.current); // Keep using the imported manager
+        break;
     }
   } catch (error) {
     console.error("Events.InteractionCreate : Failed!", error);

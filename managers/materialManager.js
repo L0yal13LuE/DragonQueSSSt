@@ -25,7 +25,9 @@ const fetchOrGetMaterialChannel = async (filters = {}) => {
   let filteredData = result;
 
   if ("channelId" in filters) {
-    filteredData = filteredData.filter((item) => item.channel_id === filters.channelId);
+    filteredData = filteredData.filter(
+      (item) => item.channel_id === filters.channelId
+    );
   }
 
   if ("isGainExp" in filters) {
@@ -37,9 +39,13 @@ const fetchOrGetMaterialChannel = async (filters = {}) => {
   return filteredData;
 };
 
-const handleMaterialCommand = async (message) => {
+const handleMaterialCommand = async (interaction) => {
   try {
-    const channelId = message.channelId;
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ ephemeral: true});
+    }
+
+    const channelId = interaction.channelId;
     const materialData = await getMaterialByChannel({
       channelId: channelId,
     });
@@ -60,21 +66,31 @@ const handleMaterialCommand = async (message) => {
         description: itemList,
       });
 
-      message.reply({ embeds: [materialEmbed] });
+      await interaction.followUp({ embeds: [materialEmbed], ephemeral: true });
     } else {
       const materialEmbed = createBaseEmbed({
         color: 0x8a2be2,
         title: `✨ No materials found for this channel ✨`,
       });
 
-      message.reply({ embeds: [materialEmbed] });
+      await interaction.followUp({ embeds: [materialEmbed], ephemeral: true });
     }
   } catch (error) {
     console.error(
-      `Unexpected error during material command for ${message.author.username}:`,
+      `Unexpected error during material command for ${interaction.user.username}:`,
       error
     );
-    message.reply("An unexpected error occurred. Please try again.");
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({
+        content: "An unexpected error occurred. Please try again.",
+        ephemeral: true,
+      });
+    } else {
+      await interaction.reply({
+        content: "An unexpected error occurred. Please try again.",
+        ephemeral: true,
+      });
+    }
     return null;
   }
 };

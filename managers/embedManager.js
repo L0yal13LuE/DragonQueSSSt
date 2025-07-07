@@ -74,8 +74,8 @@ const createMonsterStatusEmbed = (
     { name: "Name", value: monsterData.name, inline: true },
     { name: "Status", value: `**${status}**`, inline: true },
     {
-      name: "Health (HP)",
-      value: `${remainingHpText} / ${monsterData.max_hp}`,
+      name: "HP",
+      value: `${remainingHpText}`,
       inline: true,
     }
   );
@@ -89,7 +89,7 @@ const createMonsterStatusEmbed = (
   }
   if (!monsterData.is_alive && monsterData.killed_at_timestamp) {
     embed.addFields({
-      name: "Time Defeated",
+      name: "Defeated At",
       value: `<t:${Math.floor(
         new Date(monsterData.killed_at_timestamp).getTime() / 1000
       )}:R>`,
@@ -178,7 +178,6 @@ const createMonsterDefeatEmbed = (monsterData) => {
 };
 
 // --- Game Logic Embeds ---
-
 const createItemDropEmbed = (message, selectedItem, itemAmount) => {
   const itemDropEmbed = createBaseEmbed({
     color: 0xffd700,
@@ -198,7 +197,12 @@ const createItemDropEmbed = (message, selectedItem, itemAmount) => {
   return itemDropEmbed;
 };
 
-const createItemTransferEmbed = (receiver, selectedItem, itemAmount, sender) => {
+const createItemTransferEmbed = (
+  receiver,
+  selectedItem,
+  itemAmount,
+  sender
+) => {
   const itemDropEmbed = createBaseEmbed({
     color: 0xffd700,
     title: "✨ Item Transfered ✨",
@@ -229,6 +233,49 @@ const createDamageEmbed = (author, monsterName, damageDealt) => {
   );
 };
 
+// --- Leaderboard Embeds ---
+const createLeaderboardPointEmbed = (
+  leaderboardEntries,
+  currentPage,
+  pageSize
+) => {
+  const formattedLeaderboard = leaderboardEntries
+    .map((entry, index) => {
+      // Format the value with commas for readability
+      return `\`${(currentPage - 1) * pageSize + 1 + index}.\` <@${
+        entry.id
+      }> - **${entry.value.toLocaleString()}** value`;
+    })
+    .join("\n");
+
+  return createBaseEmbed({
+    color: 0xffd700, // Crimson red for damage
+    title: "🏆 Material Points Leaderboard 🏆",
+    description: `✨ Here are the top adventurers by total material points! ✨\n\n${formattedLeaderboard}`,
+  }).setFooter({ text: "Points based on material rarity." });
+};
+
+const createLeaderboardMonsterKillEmbed = (
+  leaderboardEntries,
+  currentPage,
+  pageSize
+) => {
+  const formattedLeaderboard = leaderboardEntries
+    .map((entry, index) => {
+      return `\`${(currentPage - 1) * pageSize + 1 + index}.\` <@${
+        entry.id
+      }> - **${entry.value.toLocaleString()}** kills`;
+    })
+    .join("\n");
+
+  return createBaseEmbed({
+    color: 0xdc143c, // Crimson red
+    title: "⚔️ Monster Kill Leaderboard ⚔️",
+    description: `💀 Here are the top monster slayers! 💀\n\n${formattedLeaderboard}`,
+  }).setFooter({ text: "Total monsters slain by each user." });
+};
+
+
 module.exports = {
   createRankEmbed,
   createBagEmbed,
@@ -241,4 +288,6 @@ module.exports = {
   createDamageEmbed,
   createItemTransferEmbed,
   createBaseEmbed,
+  createLeaderboardPointEmbed,
+  createLeaderboardMonsterKillEmbed
 };
