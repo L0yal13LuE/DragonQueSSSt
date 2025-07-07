@@ -1,4 +1,9 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags,
+} = require("discord.js");
 const {
   createLeaderboardValueEmbed,
   createLeaderboardMonsterKillEmbed,
@@ -7,35 +12,17 @@ const CONSTANTS = require("../../constants");
 const {
   getCachedData,
   saveCachedData,
-  deleteCachedData,
 } = require("../../providers/cacheProvider");
 const { paginateArray } = require("../utilityManager");
 const { getUser } = require("../../providers/userProvider");
 const { getEventMonsters } = require("../../providers/monsterProvider");
 
 const LEADERBOARD_MEMBER_PER_PAGE = 10;
-const BAG_AUTO_CLOSE_MINUTES = 5;
-
-const leaderboardValueInstances = new Map();
-const leaderboardValueCooldowns = new Map();
-
-const LEADERBOARD_INTERACTION_COOLDOWN_SECONDS = 5; // Cooldown for button clicks
 
 const handleLeaderboardPagination = async (interaction, prefix) => {
   const userId = interaction.user.id;
-  const now = Date.now();
 
-  // Step 1 Verify custom ID
-  const parts = interaction.customId.split("-");
-  if (parts.length < 4) {
-    console.warn(
-      `Malformed nav customId for ${userId}: ${interaction.customId}`
-    );
-    return;
-  }
-  const messageIdFromCustomId = parts[2];
-  const action = parts[3];
-
+  // Step 1: Defer the interaction
   try {
     if (!interaction.replied && !interaction.deferred) {
       await interaction.deferUpdate();
@@ -44,73 +31,49 @@ const handleLeaderboardPagination = async (interaction, prefix) => {
     }
   } catch (deferError) {
     console.error(
-      `Error deferring bag pagination update for ${userId}: ${deferError.message}`
+      `Error deferring pagination update for ${userId}: ${deferError.message}`
     );
     return;
   }
 
-  const userCooldownEndTimestamp = leaderboardValueCooldowns.get(userId);
-  if (userCooldownEndTimestamp && now < userCooldownEndTimestamp) {
-    const timeLeft = Math.ceil((userCooldownEndTimestamp - now) / 1000);
-    try {
-      // if (!interaction.replied && !interaction.deferred) {
-      //   await interaction.reply({
-      //     content: `You're navigating too quickly! Please wait ${timeLeft} more second(s).`,
-      //     //flags: MessageFlags.Ephemeral,
-      //   });
-      // }
-    } catch (e) {
-      console.warn(
-        `Cooldown ephemeral reply failed for ${userId}: ${e.message}`
-      );
-    }
-    return;
-  }
-  leaderboardValueCooldowns.set(
-    userId,
-    now + LEADERBOARD_INTERACTION_COOLDOWN_SECONDS * 1000
-  );
-
-  const leaderboardValueInstance = leaderboardValueInstances.get(userId);
-
-  if (
-    !leaderboardValueInstance ||
-    leaderboardValueInstance.message.id !== interaction.message.id ||
-    leaderboardValueInstance.message.id !== messageIdFromCustomId
-  ) {
-    try {
-      if (interaction.deferred) {
-        // Check if it was successfully deferred
-        await interaction.followUp({
-          content:
-            "This view has expired or is no longer active. Please use the command again.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-      if (interaction.message.id === messageIdFromCustomId) {
-        interaction.message
-          .edit({ components: [] })
-          .catch((e) =>
-            console.warn(
-              `Failed to disable components on old bag message ${messageIdFromCustomId}: ${e.message}`
-            )
-          );
-      }
-    } catch (e) {
-      console.warn(
-        `Expired bag view followUp failed for ${userId}: ${e.message}`
-      );
-    }
+  // Step 2: Verify custom ID
+  const parts = interaction.customId.split("-");
+  if (parts.length !== 5) {
+    console.warn(
+      `Malformed nav customId for ${userId}: ${interaction.customId}`
+    );
     return;
   }
 
-  const instanceData = leaderboardValueInstance;
+  // Step 3: Verify cache if expired already
+  const leaderboardValueKey = `${prefix}-${parts[3]}`;
+  const leaderboardCache = await getCachedData(leaderboardValueKey);
+  if (!leaderboardCache) {
+    await interaction.followUp({
+      content: `This command is out of date. Please use the command again.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Step 4: Verify user
+  const commander = leaderboardCache.commander;
+  if (commander.id !== userId) {
+    await interaction.followUp({
+      content: `This command belong to ${commander.username}. Please use the command yourself`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Step 5: Calculate the page
+  const instanceData = leaderboardCache.data;
   const totalPages = Math.ceil(
-    instanceData.data.length / LEADERBOARD_MEMBER_PER_PAGE
+    leaderboardCache.total / LEADERBOARD_MEMBER_PER_PAGE
   );
 
-  // Step ? Calculate the page
-  let currentPage = leaderboardValueInstance.currentPage;
+  const action = parts[4];
+  let currentPage = leaderboardCache.currentPage;
   let newPage = currentPage;
   if (action === "first") newPage = 1;
   else if (action === "prev") newPage = Math.max(1, currentPage - 1);
@@ -121,35 +84,53 @@ const handleLeaderboardPagination = async (interaction, prefix) => {
     return; // No actual page change, deferUpdate was enough
   }
 
-  leaderboardValueInstance.currentPage = newPage;
-  currentPage = newPage;
-
+  // Step 6: Slice data for page
   const leaderboardResult = paginateArray(
-    instanceData.data,
-    currentPage,
+    instanceData,
+    newPage,
     LEADERBOARD_MEMBER_PER_PAGE
   );
 
+  // Step 7: Create embeded
   try {
     const updatedEmbed = createLeaderboardValueEmbed(
       leaderboardResult.data,
-      currentPage,
+      newPage,
       LEADERBOARD_MEMBER_PER_PAGE
     );
+
+    // Step 8: Create pagination button
     const updatedButtons = createPaginationButtons(
-      CONSTANTS.CACHE_LEADERBOARD_VALUE_PREFIX,
+      prefix,
       interaction.message.id,
-      currentPage,
-      totalPages
+      newPage,
+      totalPages,
+      userId
     );
 
-    await interaction.editReply({
+    // Step 9: Edit the message
+    const replyMessage = await interaction.editReply({
       embeds: [updatedEmbed],
       components: [updatedButtons],
     });
+
+    // Step 10: Update cache
+    console.log(
+      `Set current page from ${leaderboardCache.currentPage} to ${newPage}`
+    );
+    leaderboardCache.currentPage = newPage;
+
+    const jsonCache = {
+      commander: leaderboardCache.commander,
+      data: leaderboardCache.data,
+      currentPage: leaderboardCache.currentPage,
+      total: leaderboardCache.total,
+      message: replyMessage,
+    };
+    saveCachedData(leaderboardValueKey, jsonCache, 0);
   } catch (error) {
     console.error(
-      `Error on editReply for bag pagination for ${userId} (page ${currentPage}): ${error.message}`
+      `Error on editReply for ${prefix} pagination for ${userId} (page ${currentPage}): ${error.message}`
     );
   }
 };
@@ -160,12 +141,12 @@ const handleLeaderboardInteraction = async (
   calculateFn,
   embededFn
 ) => {
+  var interactUser = interaction.user;
+  const userId = interactUser.id;
+
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply();
   }
-
-  var interactUser = interaction.user;
-  const userId = interactUser.id;
 
   // Step 1: Calculate
   const dataOriginal = await calculateFn();
@@ -176,9 +157,6 @@ const handleLeaderboardInteraction = async (
   }
 
   // Step 2: Save cache
-  const leaderboardValueKey = prefix + `_${userId}`;
-  saveCachedData(leaderboardValueKey, dataOriginal);
-
   const startingPage = 1;
 
   // Step 3: Slice data for page
@@ -222,7 +200,8 @@ const handleLeaderboardInteraction = async (
         prefix,
         replyMessage.id,
         startingPage,
-        leaderboardResult.totalPages
+        leaderboardResult.totalPages,
+        userId
       ),
     ];
     await replyMessage
@@ -235,33 +214,26 @@ const handleLeaderboardInteraction = async (
       );
   }
 
-  // await interaction.followUp({ embeds: [leaderboardEmbed] });
-  console.log(`[${interaction.user.username}] Replied with the leaderboard.`);
+  // Step 8: Save cache
+  const leaderboardValueKey = `${prefix}-${replyMessage.id}`;
 
-  const autoCloseMs = BAG_AUTO_CLOSE_MINUTES * 60 * 1000;
-  const timeoutId = setTimeout(async () => {
-    const currentInstance = leaderboardValueInstances.get(userId);
-    if (currentInstance && currentInstance.message.id === replyMessage.id) {
-      try {
-        await replyMessage.edit({
-          content: "**leaderboard view closed.**",
-          embeds: [],
-          components: [],
-        });
-      } catch (errorDel) {
-        console.warn("Error editing bag message on timeout:", errorDel.message);
-      }
-      leaderboardValueInstances.delete(userId);
-      // bagInteractionCooldowns.delete(userId);
-    }
-  }, autoCloseMs);
-
-  leaderboardValueInstances.set(userId, {
-    message: replyMessage,
-    timeoutId: timeoutId,
+  const jsonCache = {
+    commander: {
+      id: interactUser.id,
+      username: interactUser.username,
+    },
     data: dataOriginal,
-    currentPage: 1,
-  });
+    currentPage: startingPage,
+    total: dataOriginal.length,
+    message: replyMessage,
+  };
+  saveCachedData(
+    leaderboardValueKey,
+    jsonCache,
+    CONSTANTS.CACHE_LEADERBOARD_VALUE_TTL_MS
+  );
+
+  console.log(`[${interaction.user.username}] Replied with the leaderboard.`);
 };
 
 const calculateValueLeaderboard = async (interaction) => {
@@ -342,26 +314,27 @@ const createPaginationButtons = (
   prefix,
   messageId,
   currentPage,
-  totalPages
+  totalPages,
+  userId
 ) => {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`${prefix}-nav-${messageId}-first`)
+      .setCustomId(`${prefix}-nav-${userId}-${messageId}-first`)
       .setLabel("<< First")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(currentPage === 1 || totalPages <= 1),
     new ButtonBuilder()
-      .setCustomId(`${prefix}-nav-${messageId}-prev`)
+      .setCustomId(`${prefix}-nav-${userId}-${messageId}-prev`)
       .setLabel("< Prev")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(currentPage === 1 || totalPages <= 1),
     new ButtonBuilder()
-      .setCustomId(`${prefix}-nav-${messageId}-next`)
+      .setCustomId(`${prefix}-nav-${userId}-${messageId}-next`)
       .setLabel("Next >")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(currentPage >= totalPages || totalPages <= 1),
     new ButtonBuilder()
-      .setCustomId(`${prefix}-nav-${messageId}-last`)
+      .setCustomId(`${prefix}-nav-${userId}-${messageId}-last`)
       .setLabel("Last >>")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(currentPage >= totalPages || totalPages <= 1)
