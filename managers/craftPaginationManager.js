@@ -12,7 +12,7 @@ const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/
 // --- Configuration ---
 const BAG_ITEMS_PER_PAGE = 10;
 const BAG_AUTO_CLOSE_MINUTES = 2;
-const BAG_INTERACTION_COOLDOWN_SECONDS = 5; // Cooldown for button clicks
+const BAG_INTERACTION_COOLDOWN_SECONDS = 4; // Cooldown for button clicks
 
 // --- In-memory storage for active bag instances and user cooldowns ---
 // Key: userId, Value: { message: Message, timeoutId: Timeout, userItems: Array, currentPage: number }
@@ -147,7 +147,7 @@ const handleCraftListCommand = async (message, settings) => {
     try {
 
         // filter only items with unique name
-        const isMoreThanOne = settings.items.length > 10;
+        const isMoreThanOne = settings.items.length > BAG_ITEMS_PER_PAGE;
         const craftableItems = settings.items.filter((item, index, self) => self.findIndex(i => i.name === item.name) === index);
 
         if (!craftableItems || craftableItems.length === 0) {
@@ -194,7 +194,7 @@ const handleCraftListCommand = async (message, settings) => {
             const currentInstance = craftListIntances.get(userId);
             if (currentInstance && currentInstance.message.id === replyMessage.id) {
                 try {
-                    await replyMessage.edit({ content: 'Craftlist closed', embeds: [], components: [] });
+                    await replyMessage.edit({ content: 'Craft closed', embeds: [], components: [] });
                 } catch (errorDel) {
                     console.warn('Error editing bag message on timeout:', errorDel.message);
                 }
@@ -223,6 +223,16 @@ const handleCraftListInteraction = async (interaction, clanShopSettingData, clan
         return;
     }
 
+    // some deferring stuff with discord
+    try {
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.deferUpdate();
+        }
+    } catch (deferError) {
+        console.error(`Error deferring donation list pagination update: ${deferError.message}`);
+        return;
+    }
+
     // get channel id from interaction object and find current clan number from given setting
     const messageChannelId = interaction.message.channelId;
     const channelClanNumber = clanShopSettingData.get(messageChannelId)?.clanNumber;
@@ -240,54 +250,60 @@ const handleCraftListInteraction = async (interaction, clanShopSettingData, clan
     if (userCooldownEndTimestamp && now < userCooldownEndTimestamp) {
         const timeLeft = Math.ceil((userCooldownEndTimestamp - now) / 1000);
         try {
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({
-                    content: `You're navigating too quickly! Please wait ${timeLeft} more second(s).`,
-                    flags: MessageFlags.Ephemeral
-                });
-            }
+            return await interaction.reply({
+                content: `Please wait ${timeLeft} more second(s).`,
+                flags: MessageFlags.Ephemeral
+            });
         } catch (e) {
-            console.warn(`Cooldown ephemeral reply failed for ${userId}: ${e.message}`);
+            console.warn(`Cooldown ephemeral reply failed: ${e.message}`);
         }
         return;
     }
     craftListInteractionCooldowns.set(userId, now + (BAG_INTERACTION_COOLDOWN_SECONDS * 1000));
 
-    // some deferring stuff with discord
-    try {
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.deferUpdate();
-        } else {
-            return;
-        }
-    } catch (deferError) {
-        console.error(`Error deferring donation list pagination update for ${userId}: ${deferError.message}`);
-        return;
-    }
-
     const parts = interaction.customId.split('_');
     if (parts.length < 4) {
-        console.warn(`Malformed craftlist_nav customId for ${userId}: ${interaction.customId}`);
+        console.warn(`Malformed craftlist_nav customId: ${interaction.customId}`);
         return;
     }
     const messageIdFromCustomId = parts[2];
     const action = parts[3];
 
-    // session expire
     const bagInstance = craftListIntances.get(userId);
-    if (!bagInstance || bagInstance.message.id !== interaction.message.id || bagInstance.message.id !== messageIdFromCustomId) {
+
+    // wrong user
+    // message must matching pre-defined id
+    const msgId_A = interaction.message.id.toString();
+    const msgId_1 = messageIdFromCustomId?.toString() ?? null;
+    const msgId_2 = bagInstance?.message?.id?.toString() ?? null;
+    if (msgId_A !== msgId_1 || msgId_A !== msgId_2) {
         try {
-            if (interaction.deferred) { // Check if it was successfully deferred
-                await interaction.followUp({
-                    content: "Session expired, please use the command again.",
+            if (interaction.deferred) {
+                console.warn(`Warning User ${userId} trying to use other's interaction (1): ${interaction.customId}`);
+                return await interaction.followUp({
+                    content: "Please use your own command.",
                     flags: MessageFlags.Ephemeral
                 });
             }
-            if (interaction.message.id === messageIdFromCustomId) {
-                interaction.message.edit({ components: [] }).catch(e => console.warn(`Failed to disable components on old bag message ${messageIdFromCustomId}: ${e.message}`));
-            }
+            return;
         } catch (e) {
-            console.warn(`Expired view followUp failed for ${userId}: ${e.message}`);
+            console.warn(`[CraftPaginationManager] Expired view followUp failed (1): ${e.message}`);
+        }
+        return;
+    }
+    // session expire or session not found
+    if (!bagInstance || bagInstance === null) {
+        try {
+            if (interaction.deferred) {
+                console.warn(`Warning User ${userId} trying to use other's interaction (2): ${interaction.customId}`);
+                return await interaction.followUp({
+                    content: "Session expired or not your command.",
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            return;
+        } catch (e) {
+            console.warn(`[CraftPaginationManager] Expired view followUp failed (2): ${e.message}`);
         }
         return;
     }
@@ -326,7 +342,7 @@ const handleCraftListInteraction = async (interaction, clanShopSettingData, clan
             components: [...updatedButtons, ...updateButtonsDonate],
         });
     } catch (error) {
-        console.error(`Error on editReply for bag pagination for ${userId} (page ${currentPage}): ${error.message}`);
+        console.error(`Error on editReply for bag pagination (page ${currentPage}): ${error.message}`);
     }
 };
 
@@ -342,8 +358,12 @@ const handleCraftListButtonClick = async (interaction, clanShopSettingData, clan
     if (interaction.customId.startsWith(buttonPrefix)) {
 
         // tell discord to wait
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
+        try {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        } catch (e) {
+            console.warn(`interaction.deferReply failed: ${e.message}`);
+        }
+        
         // extract data from button
         const itemToTriggerA = interaction.customId.replace(buttonPrefix, '').replace(/_/g, '');
         const itemToTriggerPrefix = itemToTriggerA.split('@')[0] || false;
@@ -361,17 +381,18 @@ const handleCraftListButtonClick = async (interaction, clanShopSettingData, clan
 
         // session expire
         const bagInstance = craftListIntances.get(userId);
-        if (!bagInstance) {
+        if (!bagInstance || bagInstance === null) {
             try {
                 if (interaction.deferred) { // Check if it was successfully deferred
                     await interaction.followUp({
-                        content: "Session expired, please use the command again.",
+                        content: "Session expired or not your command.",
                         flags: MessageFlags.Ephemeral
                     });
-                }
-                
+                    return;
+                } 
+                return;
             } catch (e) {
-                console.warn(`Expired view followUp failed for ${userId}: ${e.message}`);
+                console.warn(`Expired view followUp failed: ${e.message}`);
             }
             return;
         }

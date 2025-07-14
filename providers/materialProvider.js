@@ -127,8 +127,10 @@ const getUserItem = async (filters = {}) => {
       );
     }
 
-    // ✅ Sort by material name
-    data.sort((a, b) => a.material.name.localeCompare(b.material.name));
+    if (data && data.length > 0) { // fixed error when no data
+      // ✅ Sort by material name
+      data.sort((a, b) => a.material.name.localeCompare(b.material.name));
+    }
 
     return data;
   } catch (error) {
