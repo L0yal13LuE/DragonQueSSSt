@@ -204,7 +204,7 @@ const createItemTransferEmbed = (
   sender
 ) => {
   const itemDropEmbed = createBaseEmbed({
-    color: 0xffd700,
+    color: 0x9b59b6,
     title: "✨ Item Transfered ✨",
     description: `${receiver} got the item!`,
   }).addFields(
@@ -244,7 +244,7 @@ const createLeaderboardPointEmbed = (
       // Format the value with commas for readability
       return `\`${(currentPage - 1) * pageSize + 1 + index}.\` <@${
         entry.id
-      }> - **${entry.value.toLocaleString()}** value`;
+      }> - **${entry.value.toLocaleString()}** points`;
     })
     .join("\n");
 
