@@ -12,7 +12,10 @@ const {
 } = require("./dbUtils");
 const { calculateNextLevelExp, getTodaysDateString } = require("./gameLogic");
 const { getUserItem } = require("./providers/materialProvider");
-const { createBagEmbed } = require("./managers/embedManager");
+const {
+  createBagEmbed,
+  createMonsterStatusEmbed,
+} = require("./managers/embedManager");
 
 /**
  * Handles the '!rank' command with a fancier embed and progress bar. Works in any channel.
@@ -119,7 +122,14 @@ const handleBagCommand = async (message) => {
 
     const itemList =
       userItems && userItems.length > 0
-        ? userItems.map(item => `${item.material.rarities.emoji} ${item.material.name} ${item.material.emoji} x ${item.amount.toLocaleString()}`).join('\n')
+        ? userItems
+            .map(
+              (item) =>
+                `${item.material.rarities.emoji} ${item.material.name} ${
+                  item.material.emoji
+                } x ${item.amount.toLocaleString()}`
+            )
+            .join("\n")
         : "Your bag is empty... Chat to find some items!";
 
     const bagEmbed = createBagEmbed(message.author, itemList);
@@ -131,17 +141,13 @@ const handleBagCommand = async (message) => {
   }
 };
 
-/**
- * Handles the '!monster' command to show today's monster status.
- */
-const handleMonsterCommand = async (message, currentMonsterState) => {
-  if (!supabase) {
-    message.reply("Database issue! Can't check monster status. 😥");
-    return;
+const handleMonsterCommand = async (interaction, currentMonsterState) => {
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply();
   }
   const today = getTodaysDateString();
   console.log(
-    `[${message.author.username}] Requested monster status for ${today}.`
+    `[${interaction.user.username}] Requested monster status for ${today}.`
   );
   try {
     // Use cached state if available and for today, otherwise fetch
@@ -151,61 +157,53 @@ const handleMonsterCommand = async (message, currentMonsterState) => {
         : await getMonsterForDate(today);
 
     if (monsterData) {
-      let status = monsterData.is_alive ? "⚔️" : "☠️";
-      let color = monsterData.is_alive ? 0xff4500 : 0x32cd32; // Orange if alive, Green if dead
-      let remainingHpText = "0";
-      if (monsterData.is_alive) {
+      const isAlive = monsterData.is_alive;
+      let status = isAlive ? "⚔️" : "☠️";
+      let color = 0xff0000; // Default red
+      let remainingHp = 0;
+
+      if (isAlive) {
         const totalDamage = await getTotalDamageDealt(today);
-        const remainingHp = Math.max(0, monsterData.max_hp - totalDamage);
-        remainingHpText = remainingHp.toString();
-        if (remainingHp <= 0) {
-          status = "☠️ (Update Pending)"; // Indicate defeat is imminent or pending update
-          color = 0x32cd32; // Show green if HP is 0 or less
+        remainingHp = Math.max(0, monsterData.max_hp - totalDamage);
+
+        const ratio = remainingHp / monsterData.max_hp;
+
+        // Set status and color based on HP ratio
+        if (ratio < 0.1) color = 0xffa500; // Orange
+        else if (ratio < 0.2) color = 0xffff00; // Yellow
+        else color = 0x32cd32; // Green
+      }
+
+      // Set readable text
+      let remainingHpText = "0";
+      if (remainingHp > 0) {
+        const ratio = remainingHp / monsterData.max_hp;
+        if (ratio < 0.1) {
+          remainingHpText = "Very Low";
+        } else if (ratio < 0.2) {
+          remainingHpText = "Low";
+        } else {
+          remainingHpText = remainingHp.toString();
         }
       }
 
-      let latestHpRow = `${remainingHpText} / ${monsterData.max_hp}`;
-      if (parseInt(remainingHpText) < (parseInt(monsterData.max_hp) * 0.2)) latestHpRow ='Low'; // hp less than 20%
-      if (parseInt(remainingHpText) < (parseInt(monsterData.max_hp) * 0.1)) latestHpRow = 'Very Low'; // hp less than 10%
+      const latestHpRow = `${remainingHpText} / ${monsterData.max_hp}`;
+      const monsterEmbed = createMonsterStatusEmbed(
+        today,
+        monsterData,
+        status,
+        latestHpRow,
+        color
+      );
 
-      const monsterEmbed = new EmbedBuilder()
-        .setColor(color)
-        .setTitle(`👽 Today's Monster Status (${today}) 🦑`)
-        .addFields(
-          { name: "Name", value: monsterData.name, inline: true },
-          { name: "Status", value: `**${status}**`, inline: true },
-          {
-            name: "HP",
-            value: latestHpRow,
-            inline: true,
-          }
-        )
-        .setTimestamp();
-
-      if (!monsterData.is_alive && monsterData.killed_by_user_id) {
-        monsterEmbed.addFields({
-          name: "Defeated By",
-          value: `<@${monsterData.killed_by_user_id}>`,
-          inline: true,
-        });
-      }
-      if (!monsterData.is_alive && monsterData.killed_at_timestamp) {
-        monsterEmbed.addFields({
-          name: "Defeated At",
-          value: `<t:${Math.floor(
-            new Date(monsterData.killed_at_timestamp).getTime() / 1000
-          )}:R>`,
-          inline: true,
-        });
-      }
-      message.reply({ embeds: [monsterEmbed] });
+      await interaction.followUp({ embeds: [monsterEmbed] });
     } else {
-      message.reply(`No monster spawned today (${today})! 😴`);
+      interaction.followUp(`No monster spawned today (${today})! 😴`);
       console.log(`No monster found for ${today} via !monster command.`);
     }
   } catch (error) {
     console.error("Error during monster command:", error);
-    message.reply("Oops! Error checking monster status. Try again.");
+    interaction.followUp("Oops! Error checking monster status. Try again.");
   }
 };
 
