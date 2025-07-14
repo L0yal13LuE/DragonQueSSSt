@@ -6,8 +6,8 @@ const { getUserItem } = require("./../providers/materialProvider"); // Adjust pa
 
 // --- Configuration ---
 const BAG_ITEMS_PER_PAGE = 10;
-const BAG_AUTO_CLOSE_MINUTES = 5;
-const BAG_INTERACTION_COOLDOWN_SECONDS = 5; // Cooldown for button clicks
+const BAG_AUTO_CLOSE_MINUTES = 2;
+const BAG_INTERACTION_COOLDOWN_SECONDS = 4; // Cooldown for button clicks
 
 // --- In-memory storage for active bag instances and user cooldowns ---
 // Key: userId, Value: { message: Message, timeoutId: Timeout, userItems: Array, currentPage: number }
@@ -174,6 +174,16 @@ const handleBagPaginationInteraction = async (interaction) => {
         return;
     }
 
+     // some deferring stuff with discord
+    try {
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.deferUpdate();
+        }
+    } catch (deferError) {
+        console.error(`Error deferring donation list pagination update: ${deferError.message}`);
+        return;
+    }
+
     const userId = interaction.user.id;
 
     const now = Date.now();
@@ -189,26 +199,15 @@ const handleBagPaginationInteraction = async (interaction) => {
                 });
             }
         } catch (e) {
-            console.warn(`Cooldown ephemeral reply failed for ${userId}: ${e.message}`);
+            console.warn(`Cooldown ephemeral reply failed : ${e.message}`);
         }
         return;
     }
     bagInteractionCooldowns.set(userId, now + (BAG_INTERACTION_COOLDOWN_SECONDS * 1000));
 
-    try {
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.deferUpdate();
-        } else {
-            return; // Already acknowledged (e.g. by cooldown reply)
-        }
-    } catch (deferError) {
-        console.error(`Error deferring bag pagination update for ${userId}: ${deferError.message}`);
-        return;
-    }
-
     const parts = interaction.customId.split('_');
     if (parts.length < 4) {
-        console.warn(`Malformed bag_nav customId for ${userId}: ${interaction.customId}`);
+        console.warn(`Malformed bag_nav customId : ${interaction.customId}`);
         return;
     }
     const messageIdFromCustomId = parts[2];
@@ -216,19 +215,39 @@ const handleBagPaginationInteraction = async (interaction) => {
 
     const bagInstance = activeBagInstances.get(userId);
 
-    if (!bagInstance || bagInstance.message.id !== interaction.message.id || bagInstance.message.id !== messageIdFromCustomId) {
+    // wrong user
+    // message must matching pre-defined id
+    const msgId_A = interaction.message.id.toString();
+    const msgId_1 = messageIdFromCustomId?.toString() ?? null;
+    const msgId_2 = bagInstance?.message?.id?.toString() ?? null;
+    if (msgId_A !== msgId_1 || msgId_A !== msgId_2) {
         try {
-            if (interaction.deferred) { // Check if it was successfully deferred
-                await interaction.followUp({
-                    content: "This bag view has expired or is no longer active. Please use the command again.",
+            if (interaction.deferred) {
+                console.warn(`Warning User ${userId} trying to use other's interaction (1): ${interaction.customId}`);
+                return await interaction.followUp({
+                    content: "Please use your own command.",
                     flags: MessageFlags.Ephemeral
                 });
             }
-            if (interaction.message.id === messageIdFromCustomId) {
-                interaction.message.edit({ components: [] }).catch(e => console.warn(`Failed to disable components on old bag message ${messageIdFromCustomId}: ${e.message}`));
-            }
+            return;
         } catch (e) {
-            console.warn(`Expired bag view followUp failed for ${userId}: ${e.message}`);
+            console.warn(`[BagPaginationManager] Expired view followUp failed (1): ${e.message}`);
+        }
+        return;
+    }
+    // session expire or session not found
+    if (!bagInstance || bagInstance === null) {
+        try {
+            if (interaction.deferred) {
+                console.warn(`Warning User ${userId} trying to use other's interaction (2): ${interaction.customId}`);
+                return await interaction.followUp({
+                    content: "Session expired or not your command.",
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            return;
+        } catch (e) {
+            console.warn(`[BagPaginationManager] Expired view followUp failed (2): ${e.message}`);
         }
         return;
     }
@@ -263,7 +282,7 @@ const handleBagPaginationInteraction = async (interaction) => {
             components: [updatedButtons],
         });
     } catch (error) {
-        console.error(`Error on editReply for bag pagination for ${userId} (page ${currentPage}): ${error.message}`);
+        console.error(`Error on editReply for bag pagination  (page ${currentPage}): ${error.message}`);
     }
 };
 
