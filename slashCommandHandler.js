@@ -242,6 +242,10 @@ const handleSendCommandSubmission = async (interaction) => {
 
       announceItemTransfer(receiver, materialToSend, amount, sender);
 
+      await interaction.editReply({
+        content: `You have successfully sent x ${amount} ${materialToSend.rarity.emoji} ${materialToSend.name} ${materialToSend.emoji} to ${receiver.username}.`,
+      });
+
       Promise.all([deleteCachedData(userBagKey)])
         .then(() => {
           console.log(
