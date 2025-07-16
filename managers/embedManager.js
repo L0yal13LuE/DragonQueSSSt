@@ -221,6 +221,24 @@ const createItemTransferEmbed = (
   return itemDropEmbed;
 };
 
+const createSpinResultEmbed = (user, selectedItem, itemAmount) => {
+  const itemDropEmbed = createBaseEmbed({
+    color: 0xffa500,
+    title: "🎰 Spin Result!",
+    description: `${user.toString()} just spun and won an item!`,
+  }).addFields(
+    { name: "Rarity", value: `${selectedItem.rarityEmoji}`, inline: true },
+    {
+      name: "Item",
+      value: `${selectedItem.name} ${selectedItem.emoji}`,
+      inline: true,
+    },
+    { name: "Amount", value: itemAmount.toString(), inline: true }
+  );
+
+  return itemDropEmbed;
+};
+
 const createDamageEmbed = (author, monsterName, damageDealt) => {
   return createBaseEmbed({
     color: 0xdc143c, // Crimson red for damage
@@ -287,7 +305,8 @@ module.exports = {
   createItemDropEmbed,
   createDamageEmbed,
   createItemTransferEmbed,
+  createSpinResultEmbed,
   createBaseEmbed,
   createLeaderboardPointEmbed,
-  createLeaderboardMonsterKillEmbed
+  createLeaderboardMonsterKillEmbed,
 };

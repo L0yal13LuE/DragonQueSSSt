@@ -14,6 +14,7 @@ const {
   createItemDropEmbed,
   createDamageEmbed,
   createItemTransferEmbed,
+  createSpinResultEmbed
 } = require("./managers/embedManager");
 
 const ANNOUNCEMENT_CHANNEL_ID = process.env.ANNOUNCEMENT_CHANNEL_ID; // For level-ups ONLY
@@ -281,6 +282,23 @@ const announceDamageDealt = (message, currentMonsterStateRef, damageDealt) => {
   }
 };
 
+const announceItemSpinResult = (interaction, selectedItem, itemAmount) => {
+  try {
+    const itemDropEmbed = createSpinResultEmbed(
+      interaction.user,
+      selectedItem,
+      itemAmount
+    );
+    itemDropChannel.send({ embeds: [itemDropEmbed] });
+    console.log(`[${interaction.username}] Sending item drop announcement.`);
+  } catch (error) {
+    console.error(
+      `Error sending item drop announcement for ${interaction.username}:`,
+      error
+    );
+  }
+};
+
 const initializeBotChannels = async (client) => {
   announcementChannel = await _fetchChannelById(
     client,
@@ -308,5 +326,6 @@ module.exports = {
   announceItemDrop,
   announceDamageDealt,
   announceItemTransfer,
+  announceItemSpinResult,
   initializeBotChannels,
 };
