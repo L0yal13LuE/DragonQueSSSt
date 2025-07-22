@@ -60,9 +60,18 @@ const commands = [
   new SlashCommandBuilder()
     .setName("monster-status")
     .setDescription("Shows the status of today's monster."),
+  // new SlashCommandBuilder()
+  //   .setName("game-spin")
+  //   .setDescription("this feature is stil under development."),
   new SlashCommandBuilder()
-    .setName("game-spin")
-    .setDescription("this feature is stil under development."),
+    .setName("game-assemble-xx")
+    .setDescription("this feature is stil under development.")
+    .addUserOption((option) =>
+      option
+        .setName("user")
+        .setDescription("Choose the player to challenge")
+        .setRequired(true)
+    ),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(token);
