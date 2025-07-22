@@ -54,10 +54,15 @@ const commands = [
     ),
   new SlashCommandBuilder()
     .setName("droprate")
-    .setDescription("Shows the drop rates for materials in the current channel."),
+    .setDescription(
+      "Shows the drop rates for materials in the current channel."
+    ),
   new SlashCommandBuilder()
     .setName("monster-status")
     .setDescription("Shows the status of today's monster."),
+  new SlashCommandBuilder()
+    .setName("game-spin")
+    .setDescription("this feature is stil under development."),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(token);
@@ -75,3 +80,4 @@ const rest = new REST({ version: "10" }).setToken(token);
 })();
 
 // $env:NODE_ENV="blue"; node deploy-commands.js // run command
+// $env:NODE_ENV="production"; node deploy-commands.js // run command

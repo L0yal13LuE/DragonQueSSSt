@@ -24,6 +24,7 @@ const commandHandlers = require("./commandHandlers"); // Assuming command handle
 const cacheManager = require("./managers/cacheManager");
 
 // --- Command Handlers ---
+const { handleSpinCommand, handleSpinButton } = require('./managers/spinManager.js'); // Import the spin command handler
 const { handleMaterialCommand } = require("./managers/materialManager.js");
 const {
   handleLeaderboardCommand,
@@ -314,27 +315,6 @@ client.on("messageCreate", async (message) => {
           return;
         }
         break;
-      // case "craft": // old craft
-      //   // find out if user typing this craft command in clan channel and craft command is valid
-      //   const craftInClan = clanCraftSettingData.find(
-      //     (row) => row.channel_id == message.channel.id
-      //   );
-      //   if (
-      //     craftInClan &&
-      //     craftInClan.setting &&
-      //     craftInClan.setting.items.length > 0
-      //   ) {
-      //     await handleCraftCommand(message, craftInClan.setting);
-      //   } else {
-      //     // somehow craft clan command is not valid -> try normal craft command
-      //     if (craftWorkShopSettings) {
-      //       await handleCraftCommand(message, craftWorkShopSettings);
-      //     }
-      //   }
-      //   break;
-      // case 'chat': // useless ?
-      //     commandHandlers.handleChatCommand(message, args);
-      //     break;
       case "bag":
         await commandHandlers.handleBagCommand(message);
         break;
@@ -546,6 +526,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         prefix: "bag_nav_",
         handler: (i) => handleBagPaginationInteraction(i),
       },
+      {
+        prefix: "SPIN",
+        handler: (i) => handleSpinButton(i),
+      },
     ];
 
     // Usage
@@ -573,6 +557,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         break;
       case "monster-status":
         await commandHandlers.handleMonsterCommand(interaction, currentMonsterStateRef.current); // Keep using the imported manager
+        break;
+      case "game-spin":
+        await handleSpinCommand(interaction); // Keep using the imported manager
         break;
     }
   } catch (error) {
