@@ -293,6 +293,61 @@ const createLeaderboardMonsterKillEmbed = (
   }).setFooter({ text: "Total monsters slain by each user." });
 };
 
+const createAssembleEmbed = (
+  player1,
+  player2,
+  player1FormattedResult,
+  player2FormattedResult,
+  currentPlayer,
+  footer = "Guess you destinated number!"
+) => {
+  if (!footer || footer.trim() === "") {
+    footer = "Guess you destinated number!";
+  }
+
+  return createBaseEmbed({
+    color: 0xdc143c, // Crimson red
+    title: "Assemble XX",
+    description: ` \n${currentPlayer}'s Turn\n`,
+  })
+    .addFields(
+      { name: `${player1.username}`, value: `${player1FormattedResult}` },
+      { name: `${player2.username}`, value: `${player2FormattedResult}` }
+    )
+    .setFooter({ text: `${footer}` })
+    .setTimestamp(null);
+};
+
+const createAssembleFinalEmbed = (
+  player1,
+  player2,
+  player1FormattedResult,
+  player2FormattedResult,
+  answer,
+  winner
+) => {
+  return createBaseEmbed({
+    color: 0xdc143c, // Crimson red
+    title: "Assemble XX",
+    description: ` \nGame Over\n`,
+  })
+    .addFields(
+      {
+        name: `${player1.username}`,
+        value: `${player1FormattedResult}`,
+      },
+      {
+        name: `${player2.username}`,
+        value: `${player2FormattedResult}`,
+      },
+      {
+        name: `Winner`,
+        value: `${winner}`,
+      }
+    )
+    .setFooter({ text: ` \nThe Answer is **${answer}**\n` })
+    .setTimestamp(null);
+};
 
 module.exports = {
   createRankEmbed,
@@ -309,4 +364,6 @@ module.exports = {
   createBaseEmbed,
   createLeaderboardPointEmbed,
   createLeaderboardMonsterKillEmbed,
+  createAssembleEmbed,
+  createAssembleFinalEmbed,
 };
