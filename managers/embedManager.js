@@ -357,6 +357,29 @@ const createAssembleFinalEmbed = (
     .setTimestamp(null);
 };
 
+const createSpyFallInvitationEmbed = (commander) => {
+  return createBaseEmbed({
+    color: 0xdc143c, // Crimson red
+    title: `Spyfall Player Recruitment`,
+    description: ` \n${commander.toString()}\n`,
+  })
+    .addFields(
+      {
+        name: `${player1.username}`,
+        value: `${player1FormattedResult}`,
+      },
+      {
+        name: `${player2.username}`,
+        value: `${player2FormattedResult}`,
+      },
+      {
+        name: `Winner`,
+        value: `${winner}`,
+      }
+    )
+    .setFooter({ text: ` \nThe Answer is **${answer}**\n` });
+};
+
 module.exports = {
   createRankEmbed,
   createBagEmbed,
@@ -375,4 +398,5 @@ module.exports = {
   createAssembleEmbed,
   createAssembleFinalEmbed,
   createGameInvatationEmbed,
+  createSpyFallInvitationEmbed,
 };
