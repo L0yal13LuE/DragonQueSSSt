@@ -315,7 +315,7 @@ const createAssembleEmbed = (
 
   return createBaseEmbed({
     color: 0xdc143c, // Crimson red
-    title: "Assemble XX",
+    title: "AssembleXX",
     description: ` \n${currentPlayer}'s Turn\n`,
   })
     .addFields(
@@ -336,7 +336,7 @@ const createAssembleFinalEmbed = (
 ) => {
   return createBaseEmbed({
     color: 0xdc143c, // Crimson red
-    title: "Assemble XX",
+    title: "AssembleXX",
     description: ` \nGame Over\n`,
   })
     .addFields(

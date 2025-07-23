@@ -275,7 +275,7 @@ const handleAssembleCommand = async (interaction) => {
       const messageLink = `https://discord.com/channels/${replyMessage.guildId}/${replyMessage.channelId}/${replyMessage.id}`;
       const invitationEmbed = createGameInvatationEmbed(
         commander,
-        "Assemble XX",
+        "AssembleXX",
         messageLink
       );
 
