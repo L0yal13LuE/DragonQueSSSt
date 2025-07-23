@@ -75,26 +75,16 @@ const commands = [
   new SlashCommandBuilder()
     .setName("game")
     .setDescription("this feature is stil under development.")
-    // .addUserOption((option) =>
-    //   option
-    //     .setName("user")
-    //     .setDescription("Choose the player to challenge")
-    //     .setRequired(true)
-    // )
     .addStringOption((option) =>
       option
-        .setName("assemble-xx")
-        // .setDescription("add up the number to your destinated number.")
+        .setName("type")
+        .setDescription("choose you game")
         .setRequired(true)
-        .setAutocomplete(true)
+        .addChoices(
+          { name: "AssembleXX", value: "assembleXX" },
+          { name: "Spyfall", value: "spyfall" },
+        )
     )
-    .addStringOption((option) =>
-      option
-        .setName("spyfall")
-        // .setDescription("Find the spy!!")
-        .setRequired(true)
-        .setAutocomplete(true)
-    ),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(token);
