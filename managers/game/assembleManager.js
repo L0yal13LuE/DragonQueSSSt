@@ -14,6 +14,7 @@ const {
 const {
   createAssembleEmbed,
   createAssembleFinalEmbed,
+  createGameInvatationEmbed,
 } = require("../embedManager");
 
 const CONSTANTS = require("../../constants");
@@ -271,11 +272,14 @@ const handleAssembleCommand = async (interaction) => {
 
     // Step: Send a notification to the challenger
     if (replyMessage.guildId) {
-      let dmMessage = `${commander.username} has challenged you to AssembleXX.`;
       const messageLink = `https://discord.com/channels/${replyMessage.guildId}/${replyMessage.channelId}/${replyMessage.id}`;
-      dmMessage += `\nHere’s your link: ${messageLink}`;
+      const invitationEmbed = createGameInvatationEmbed(
+        commander,
+        "Assemble XX",
+        messageLink
+      );
 
-      challenger.send(dmMessage);
+      challenger.send({ embeds: [invitationEmbed] });
     }
 
     const answer = Math.floor(Math.random() * (100 - 20 + 1)) + 20;

@@ -293,6 +293,14 @@ const createLeaderboardMonsterKillEmbed = (
   }).setFooter({ text: "Total monsters slain by each user." });
 };
 
+const createGameInvatationEmbed = (commander, gameName, messageLink) => {
+  return createBaseEmbed({
+    color: 0xff0000,
+    title: "⚔️ You've Been Challenged!",
+    description: `${commander.username} has challenged you to ${gameName}.\nHere’s your link: ${messageLink}`,
+  });
+};
+
 const createAssembleEmbed = (
   player1,
   player2,
@@ -366,4 +374,5 @@ module.exports = {
   createLeaderboardMonsterKillEmbed,
   createAssembleEmbed,
   createAssembleFinalEmbed,
+  createGameInvatationEmbed,
 };
