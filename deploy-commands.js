@@ -81,7 +81,7 @@ const commands = [
         .setDescription("choose you game")
         .setRequired(true)
         .addChoices(
-          { name: "AssembleXX", value: "assembleXX" },
+          { name: "AssembleXX", value: "assemble" },
           { name: "Spyfall", value: "spyfall" },
         )
     )

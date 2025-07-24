@@ -357,27 +357,40 @@ const createAssembleFinalEmbed = (
     .setTimestamp(null);
 };
 
-const createSpyFallInvitationEmbed = (commander) => {
+// const createSpyFallInvitationEmbed = (commander, expiresAt) => {
+//   return createBaseEmbed({
+//     color: 0xdc143c, // Crimson red
+//     title: "🕵️ Spyfall Player Recruitment",
+//     description:
+//       `A secret game of deduction and deception is about to begin...\n\n` +
+//       `👤 **Host:** ${commander.toString()}\n` +
+//       `📢 Looking for agents to join the mission!\n\n` +
+//       `⏳ **Starting in:** <t:${expiresAt}:R>`,
+//     footer: { text: "Minimum 3 players required to start the game." },
+//   });
+// };
+
+const createSpyFallInvitationEmbed = (
+  commander,
+  expiresAt,
+  players = [],
+  minPlayer = 3
+) => {
+  const playerList =
+    players.map((id, index) => `\`${index + 1}\` <@${id}>`).join("\n") ||
+    "*No one has joined yet.*";
+
   return createBaseEmbed({
     color: 0xdc143c, // Crimson red
-    title: `Spyfall Player Recruitment`,
-    description: ` \n${commander.toString()}\n`,
-  })
-    .addFields(
-      {
-        name: `${player1.username}`,
-        value: `${player1FormattedResult}`,
-      },
-      {
-        name: `${player2.username}`,
-        value: `${player2FormattedResult}`,
-      },
-      {
-        name: `Winner`,
-        value: `${winner}`,
-      }
-    )
-    .setFooter({ text: ` \nThe Answer is **${answer}**\n` });
+    title: "🕵️ Spyfall Player Recruitment",
+    description:
+      `👤 **Host:** ${commander}\n\n` +
+      `🧑‍🤝‍🧑 **Players Joined:**\n${playerList}\n\n` +
+      `⏳ **Game starts:** <t:${expiresAt}:R>\n` +
+      `🔘 Press **Join Game** below to enlist.`,
+    footer: { text: `Minimum ${minPlayer} players required.` },
+    timestamp: new Date(),
+  });
 };
 
 module.exports = {

@@ -35,8 +35,12 @@ const {
 } = require("./managers/leaderboard/leaderboardManager.js");
 const {
   handleAssembleButton,
-  handleAssembleCommand
+  handleAssembleCommand,
 } = require("./managers/game/assembleManager.js");
+const {
+  handleSpyFallCommand,
+  handleSpyFallButton,
+} = require("./managers/game/spyFallManager.js");
 
 const {
   shopSettings,
@@ -304,6 +308,32 @@ client.on("messageCreate", async (message) => {
     const command = args.shift().toLowerCase();
 
     switch (command) {
+      // case "announce": {
+      //   const userList = [
+      //     "934741477316259880",
+      //     "635445458239619087", // me
+      //     "477494817568325640", // camel
+      //     "727372637927374869", // pd
+      //     "310286654713888779", // moss
+      //     "781862148363649024", // light
+      //     "251346127901818880", // gunsk
+      //     "692020038328254604", // pan
+      //     "886223513139159060" // moo
+      //   ]; // Add more user IDs
+
+      //   for (const userId of userList) {
+      //     try {
+      //       const user = await client.users.fetch(userId); // Fetch the user
+      //       await user.send("📢 คำเตือน อยู่ให้ห่างจากคนหลายใจ อยู่ให้ห่างจาก CodenameA");
+      //     } catch (error) {
+      //       console.error(
+      //         `❌ Failed to send DM to user ${userId}:`,
+      //         error.message
+      //       );
+      //     }
+      //   }
+      //   break;
+      // }
       case "rank":
       case "level":
         commandHandlers.handleRankCommand(message);
@@ -544,6 +574,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         prefix: "ASSEMBLE",
         handler: (i) => handleAssembleButton(i),
       },
+      {
+        prefix: "SPYFALL",
+        handler: (i) => handleSpyFallButton(i),
+      },
     ];
 
     // Usage
@@ -580,6 +614,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
       case "game-assemble-xx":
         await handleAssembleCommand(interaction); // Keep using the imported manager
         break;
+      case "game":
+        const focusedOption = interaction.options.getString("type");
+        if (focusedOption == "assemble") {
+          await handleAssembleCommand(interaction); // Keep using the imported manager
+          break;
+        } else if (focusedOption == "spyfall") {
+          await handleSpyFallCommand(interaction); // Keep using the imported manager
+          break;
+        }
     }
   } catch (error) {
     console.error("Events.InteractionCreate : Failed!", error);
