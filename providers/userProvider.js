@@ -13,10 +13,11 @@ const getUser = async (filters = {}) => {
         userMaterial:user_material (
             amount, 
             material:materials (
-                name, 
+                name,
+                default_points,
                 rarity:rarities (
-                    name, 
-                    emoji, 
+                    name,
+                    emoji,
                     value
                 )
             )

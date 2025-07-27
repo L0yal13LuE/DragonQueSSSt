@@ -257,14 +257,16 @@ const calculateValueLeaderboard = async (interaction) => {
     // Calculate total value from the nested userMaterial array.
     const totalMaterialValue = (user.userMaterial || []).reduce(
       (total, item) => {
-        // Check for valid data to prevent errors.
-        if (
-          item.material &&
-          item.material.rarity &&
-          typeof item.material.rarity.value === "number"
-        ) {
-          return total + item.amount * item.material.rarity.value;
+        const material = item.material;
+        const amount = item.amount || 0;
+
+        if (material) {
+          const points = material.default_points ?? material.rarity?.value;
+          if (typeof points === "number") {
+            return total + amount * points;
+          }
         }
+
         return total;
       },
       0
