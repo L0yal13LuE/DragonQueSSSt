@@ -204,7 +204,7 @@ const createItemTransferEmbed = (
   sender
 ) => {
   const itemDropEmbed = createBaseEmbed({
-    color: 0xffd700,
+    color: 0x9b59b6,
     title: "✨ Item Transfered ✨",
     description: `${receiver} got the item!`,
   }).addFields(
@@ -216,6 +216,24 @@ const createItemTransferEmbed = (
     },
     { name: "Amount", value: itemAmount.toString(), inline: true },
     { name: "From", value: `${sender}`, inline: true }
+  );
+
+  return itemDropEmbed;
+};
+
+const createSpinResultEmbed = (user, selectedItem, itemAmount) => {
+  const itemDropEmbed = createBaseEmbed({
+    color: 0xffa500,
+    title: "🎰 Spin Result!",
+    description: `${user.toString()} just spun and won an item!`,
+  }).addFields(
+    { name: "Rarity", value: `${selectedItem.rarityEmoji}`, inline: true },
+    {
+      name: "Item",
+      value: `${selectedItem.name} ${selectedItem.emoji}`,
+      inline: true,
+    },
+    { name: "Amount", value: itemAmount.toString(), inline: true }
   );
 
   return itemDropEmbed;
@@ -244,7 +262,7 @@ const createLeaderboardPointEmbed = (
       // Format the value with commas for readability
       return `\`${(currentPage - 1) * pageSize + 1 + index}.\` <@${
         entry.id
-      }> - **${entry.value.toLocaleString()}** value`;
+      }> - **${entry.value.toLocaleString()}** points`;
     })
     .join("\n");
 
@@ -275,6 +293,69 @@ const createLeaderboardMonsterKillEmbed = (
   }).setFooter({ text: "Total monsters slain by each user." });
 };
 
+const createGameInvatationEmbed = (commander, gameName, messageLink) => {
+  return createBaseEmbed({
+    color: 0xff0000,
+    title: "⚔️ You've Been Challenged!",
+    description: `${commander.username} has challenged you to ${gameName}.\nHere’s your link: ${messageLink}`,
+  });
+};
+
+const createAssembleEmbed = (
+  player1,
+  player2,
+  player1FormattedResult,
+  player2FormattedResult,
+  currentPlayer,
+  footer = "Guess you destinated number!"
+) => {
+  if (!footer || footer.trim() === "") {
+    footer = "Guess you destinated number!";
+  }
+
+  return createBaseEmbed({
+    color: 0xdc143c, // Crimson red
+    title: "Assemble XX",
+    description: ` \n${currentPlayer}'s Turn\n`,
+  })
+    .addFields(
+      { name: `${player1.username}`, value: `${player1FormattedResult}` },
+      { name: `${player2.username}`, value: `${player2FormattedResult}` }
+    )
+    .setFooter({ text: `${footer}` })
+    .setTimestamp(null);
+};
+
+const createAssembleFinalEmbed = (
+  player1,
+  player2,
+  player1FormattedResult,
+  player2FormattedResult,
+  answer,
+  winner
+) => {
+  return createBaseEmbed({
+    color: 0xdc143c, // Crimson red
+    title: "Assemble XX",
+    description: ` \nGame Over\n`,
+  })
+    .addFields(
+      {
+        name: `${player1.username}`,
+        value: `${player1FormattedResult}`,
+      },
+      {
+        name: `${player2.username}`,
+        value: `${player2FormattedResult}`,
+      },
+      {
+        name: `Winner`,
+        value: `${winner}`,
+      }
+    )
+    .setFooter({ text: ` \nThe Answer is **${answer}**\n` })
+    .setTimestamp(null);
+};
 
 module.exports = {
   createRankEmbed,
@@ -287,7 +368,11 @@ module.exports = {
   createItemDropEmbed,
   createDamageEmbed,
   createItemTransferEmbed,
+  createSpinResultEmbed,
   createBaseEmbed,
   createLeaderboardPointEmbed,
-  createLeaderboardMonsterKillEmbed
+  createLeaderboardMonsterKillEmbed,
+  createAssembleEmbed,
+  createAssembleFinalEmbed,
+  createGameInvatationEmbed,
 };

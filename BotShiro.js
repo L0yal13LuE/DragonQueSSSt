@@ -24,11 +24,19 @@ const commandHandlers = require("./commandHandlers"); // Assuming command handle
 const cacheManager = require("./managers/cacheManager");
 
 // --- Command Handlers ---
+const {
+  handleSpinCommand,
+  handleSpinButton,
+} = require("./managers/spinManager.js"); // Import the spin command handler
 const { handleMaterialCommand } = require("./managers/materialManager.js");
 const {
   handleLeaderboardCommand,
   handleLeaderboardPagination,
 } = require("./managers/leaderboard/leaderboardManager.js");
+const {
+  handleAssembleButton,
+  handleAssembleCommand
+} = require("./managers/game/assembleManager.js");
 
 const {
   shopSettings,
@@ -229,7 +237,8 @@ client.once("ready", async () => {
         CONSTANTS.HOURLY_CHECK_INTERVAL
       );
       console.log(
-        `Hourly monster check scheduled every ${CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)
+        `Hourly monster check scheduled every ${
+          CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)
         } minutes.`
       );
     } catch (error) {
@@ -243,9 +252,9 @@ client.once("ready", async () => {
 
   // Spawn clan shop from s1-s24
   const clanNumbers = [
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-    22, 23, 24,
-  ],
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+      22, 23, 24,
+    ],
     clanNumbersInitial = [];
   await Promise.all(
     clanNumbers.map(async (clanNumber) => {
@@ -314,27 +323,6 @@ client.on("messageCreate", async (message) => {
           return;
         }
         break;
-      // case "craft": // old craft
-      //   // find out if user typing this craft command in clan channel and craft command is valid
-      //   const craftInClan = clanCraftSettingData.find(
-      //     (row) => row.channel_id == message.channel.id
-      //   );
-      //   if (
-      //     craftInClan &&
-      //     craftInClan.setting &&
-      //     craftInClan.setting.items.length > 0
-      //   ) {
-      //     await handleCraftCommand(message, craftInClan.setting);
-      //   } else {
-      //     // somehow craft clan command is not valid -> try normal craft command
-      //     if (craftWorkShopSettings) {
-      //       await handleCraftCommand(message, craftWorkShopSettings);
-      //     }
-      //   }
-      //   break;
-      // case 'chat': // useless ?
-      //     commandHandlers.handleChatCommand(message, args);
-      //     break;
       case "bag":
         await commandHandlers.handleBagCommand(message);
         break;
@@ -348,7 +336,9 @@ client.on("messageCreate", async (message) => {
         break;
       case "donate":
       case "donation":
-        const channelClanNumber = clanShopSettingData.get(message.channel.id)?.clanNumber;
+        const channelClanNumber = clanShopSettingData.get(
+          message.channel.id
+        )?.clanNumber;
         const donationChannelClanObj = clanCraftSettingData.find(
           (row) => row.channel_id == message.channel.id
         );
@@ -546,6 +536,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
         prefix: "bag_nav_",
         handler: (i) => handleBagPaginationInteraction(i),
       },
+      {
+        prefix: "SPIN",
+        handler: (i) => handleSpinButton(i),
+      },
+      {
+        prefix: "ASSEMBLE",
+        handler: (i) => handleAssembleButton(i),
+      },
     ];
 
     // Usage
@@ -560,19 +558,27 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     // Submit case
-    switch(interaction.commandName)
-    {
+    switch (interaction.commandName) {
       case "droprate":
         await handleMaterialCommand(interaction);
         break;
-      case "send":         
+      case "send":
         await handleSendCommand(interaction); // Keep using the imported manager
         break;
-      case "leaderboard":         
+      case "leaderboard":
         await handleLeaderboardCommand(interaction); // Keep using the imported manager
         break;
       case "monster-status":
-        await commandHandlers.handleMonsterCommand(interaction, currentMonsterStateRef.current); // Keep using the imported manager
+        await commandHandlers.handleMonsterCommand(
+          interaction,
+          currentMonsterStateRef.current
+        ); // Keep using the imported manager
+        break;
+      case "game-spin":
+        await handleSpinCommand(interaction); // Keep using the imported manager
+        break;
+      case "game-assemble-xx":
+        await handleAssembleCommand(interaction); // Keep using the imported manager
         break;
     }
   } catch (error) {
