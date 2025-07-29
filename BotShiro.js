@@ -410,7 +410,6 @@ client.on("messageCreate", async (message) => {
           await message.channel.sendTyping(); 
       }
       fortuneTeller.processQueue();
-      return;
     }
     // --- END BOT MENTION CHECK ---
 

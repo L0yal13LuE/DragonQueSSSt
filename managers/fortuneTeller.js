@@ -89,8 +89,8 @@ let isProcessingQueue = false;
  */
 async function getFortuneFromAI(userMessageContent) {
     // --- New: Check for GROQ_API_KEY and return a random meow if missing ---
-    if (!GROQ_API_KEY || userMessageContent || !userMessageContent) {
-        // console.error("GROQ_API_KEY is not set. Returning a random meow.");
+    if (!GROQ_API_KEY) {
+        console.error("GROQ_API_KEY is not set. Returning a random meow.");
         // const meowTexts = ["เมี๊ยว", "เมี้ยววว", "ม๊าววว", "หง่าววว"];
         // const randomIndex = Math.floor(Math.random() * meowTexts.length);
         // return meowTexts[randomIndex];
