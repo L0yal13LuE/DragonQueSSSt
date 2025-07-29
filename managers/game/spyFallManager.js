@@ -12,134 +12,17 @@ const {
 } = require("../../providers/cacheProvider");
 
 const {
-  createAssembleEmbed,
-  createAssembleFinalEmbed,
-  createGameInvatationEmbed,
   createSpyFallInvitationEmbed,
+  createSpyFallRoleDMEmbed,
 } = require("../embedManager");
 
 const CONSTANTS = require("../../constants");
 
 const spyFallGame = new Map();
 const prefix = "SPYFALL";
-const MINIMUM_PLAYER = 2;
+const MINIMUM_PLAYER = 3;
 
-const handleJoinButton = async (interaction, parts) => {
-  const commander = interaction.user;
-
-  const messageId = parts[1];
-  const gameKey = `${prefix}-${messageId}`;
-  const game = spyFallGame.get(gameKey);
-  if (!game) {
-    await interaction.followUp({
-      content: "This game lobby has expired or could not be found.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  // Prevent duplicate players
-  if (game.players.includes(commander.id)) {
-    await interaction.followUp({
-      content: "You have already joined this game.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  game.players.push(commander.id);
-  spyFallGame.set(gameKey, game); // Update the game state in the map
-
-  if (game.players.length >= MINIMUM_PLAYER) {
-    const embed = createSpyFallInvitationEmbed(
-      game.commander, // Use the original host
-      game.expiresAt, // Use the stored expiration time
-      game.players
-    );
-
-    // Step: Add button
-    const rows = createPreGameButton(messageId, game.players);
-
-    // Step: Edit the reply with the updated embed
-    await interaction.editReply({ embeds: [embed], components: rows });
-  } else {
-    const embed = createSpyFallInvitationEmbed(
-      game.commander, // Use the original host
-      game.expiresAt, // Use the stored expiration time
-      game.players,
-      MINIMUM_PLAYER
-    );
-
-    // Step: Edit the reply with the updated embed
-    await interaction.editReply({ embeds: [embed] });
-  }
-};
-
-const handleLeaveButton = async (interaction, parts) => {
-  const commander = interaction.user;
-
-  const messageId = parts[1];
-  const gameKey = `${prefix}-${messageId}`;
-  const game = spyFallGame.get(gameKey);
-  if (!game) {
-    await interaction.followUp({
-      content: "This game lobby has expired or could not be found.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  // Host cannot leave the game
-  if ((game.commander.id = commander.id)) {
-    await interaction.followUp({
-      content: "Host cannot leave the game.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  // Prevent players that're not even join the game
-  if (!game.players.includes(commander.id)) {
-    await interaction.followUp({
-      content: "You haven't joined this game yet.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  const index = game.players.indexOf(commander.id);
-  if (index !== -1) {
-    game.players.splice(index, 1); // Remove 1 item at that index
-  }
-
-  spyFallGame.set(gameKey, game); // Update the game state in the map
-
-  if (game.players.length >= MINIMUM_PLAYER) {
-    const embed = createSpyFallInvitationEmbed(
-      game.commander, // Use the original host
-      game.expiresAt, // Use the stored expiration time
-      game.players
-    );
-
-    // Step: Add button
-    const rows = createPreGameButton(messageId, game.players);
-
-    // Step: Edit the reply with the updated embed
-    await interaction.editReply({ embeds: [embed], components: rows });
-  } else {
-    const embed = createSpyFallInvitationEmbed(
-      game.commander, // Use the original host
-      game.expiresAt, // Use the stored expiration time
-      game.players,
-      MINIMUM_PLAYER
-    );
-
-    // Step: Edit the reply with the updated embed
-    await interaction.editReply({ embeds: [embed] });
-  }
-};
-
-const handleSpyFallButton = async (interaction) => {
+const handleSpyFallButton = async (interaction, client) => {
   const commander = interaction.user;
 
   // Step: Defer the interaction
@@ -170,7 +53,7 @@ const handleSpyFallButton = async (interaction) => {
   const action = parts[2];
 
   const gameKey = `${prefix}-${messageId}`;
-  const game = spyFallGame.get(gameKey);
+  let game = spyFallGame.get(gameKey);
   if (!game) {
     await interaction.followUp({
       content: "This game lobby has expired or could not be found.",
@@ -181,18 +64,141 @@ const handleSpyFallButton = async (interaction) => {
 
   switch (action) {
     case "JOIN":
-      handleJoinButton(interaction, parts);
+      _handleJoinButton(interaction, game);
       return;
     case "LEAVE":
-      handleLeaveButton(interaction, parts);
+      _handleLeaveButton(interaction, game);
       return;
     case "START":
-      handleJoinButton(interaction, parts);
+      _handleStartButton(interaction, game, client);
       return;
     default:
       return;
   }
 };
+
+const _handleJoinButton = async (interaction, game) => {
+  const commander = interaction.user;
+  const messageId = game.messageId;
+  const gameKey = `${prefix}-${messageId}`;
+
+  // Prevent duplicate players
+  if (game.players.some((player) => player.user.id === commander.id)) {
+    await interaction.followUp({
+      content: "You have already joined this game.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  game.players.push({
+    user: commander,
+    roleId: 0,
+  });
+  spyFallGame.set(gameKey, game); // Update the game state in the map
+
+  game = spyFallGame.get(gameKey);
+  await _handlePreGameEmbed(interaction, game);
+};
+
+const _handleLeaveButton = async (interaction, game) => {
+  const commander = interaction.user;
+  const messageId = game.messageId;
+  const gameKey = `${prefix}-${messageId}`;
+
+  // Host cannot leave the game
+  if (game.commander.id == commander.id) {
+    await interaction.followUp({
+      content: "Host cannot leave the game.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Prevent players that're not even join the game
+  if (!game.players.some((player) => player.user.id === commander.id)) {
+    await interaction.followUp({
+      content: "You haven't joined this game yet.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const index = game.players.findIndex(
+    (player) => player.user.id === commander.id
+  );
+  if (index !== -1) {
+    game.players.splice(index, 1); // Remove 1 item at that index
+  }
+
+  spyFallGame.set(gameKey, game); // Update the game state in the map
+
+  game = spyFallGame.get(gameKey);
+  await _handlePreGameEmbed(interaction, game);
+};
+
+const _handleStartButton = async (interaction, game, client) => {
+  const commander = interaction.user;
+  const messageId = game.messageId;
+  const gameKey = `${prefix}-${messageId}`;
+
+  // Only host can start the game
+  if (game.commander.id != commander.id) {
+    await interaction.followUp({
+      content: "Only host can start the game.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const pool = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+    22, 23, 24,
+  ];
+
+  const players = _setSpyRole(game.players, pool);
+  game.players = players;
+  spyFallGame.set(gameKey, game); // Update the game state in the map
+
+  for (const player of game.players) {
+    try {
+      const message = createSpyFallRoleDMEmbed();
+
+      const user = await client.users.fetch(player.user.id); // Fetch the user
+      await user.send(message);
+    } catch (error) {
+      console.error(`❌ Failed to send DM to user ${userId}:`, error.message);
+    }
+  }
+};
+
+function _setSpyRole(players, itemPool, spyCount = 0) {
+  const playerCount = players.length;
+  if (spyCount == 0) {
+    if (playerCount >= 11) spyCount = 3;
+    else if (playerCount >= 7) spyCount = 2;
+    else if (playerCount >= 3) spyCount = 1;
+  }
+
+  const randomItem = itemPool[Math.floor(Math.random() * itemPool.length)];
+  const shuffled = [...players].sort(() => Math.random() - 0.5);
+  const spies = shuffled.slice(0, spyCount).map((item) => item.user.id);
+
+  const result = [];
+
+  players.forEach((item) => {
+    const aa = {
+      user: item.user,
+      roleId: spies.some((spy) => spy === item.user.id) ? 2 : 1, // 2 = spy, 1 = normal player
+      item: spies.some((spy) => spy === item.user.id) ? null : randomItem,
+    };
+
+    result.push(aa);
+  });
+
+  // Return full player object list
+  return result;
+}
 
 const handleSpyFallCommand = async (interaction) => {
   const commander = interaction.user;
@@ -203,36 +209,53 @@ const handleSpyFallCommand = async (interaction) => {
 
   const countdownMinutes = 5;
   const expiresAt = Math.floor(Date.now() / 1000) + countdownMinutes * 60;
-  const embed = createSpyFallInvitationEmbed(commander, expiresAt, [
-    commander.id,
-  ]);
+  const initialPlayerPool = [
+    {
+      user: commander,
+      roleId: 0,
+    },
+  ];
+
+  const embed = createSpyFallInvitationEmbed(
+    commander,
+    expiresAt,
+    initialPlayerPool
+  );
 
   let replyMessage = await interaction.followUp({
     embeds: [embed],
   });
 
-  // Step: Add button
-  const rows = createPreGameButton(replyMessage.id);
+  const gameKey = `${prefix}-${replyMessage.id}`;
 
-  spyFallGame.set(`${prefix}-${replyMessage.id}`, {
+  spyFallGame.set(`${gameKey}`, {
     commander: commander,
-    players: [commander.id],
-    message: replyMessage,
+    players: initialPlayerPool,
+    messageId: replyMessage.id,
     expiresAt: expiresAt,
   });
 
-  // Step: Edit the reply
-  await replyMessage
-    .edit({ components: rows })
-    .catch((e) =>
-      console.warn(
-        "Failed to edit SPYFALL buttons with final components:",
-        e.message
-      )
-    );
+  const game = spyFallGame.get(gameKey);
+  await _handlePreGameEmbed(interaction, game);
 };
 
-const createPreGameButton = (messageId, playerLists = []) => {
+const _handlePreGameEmbed = async (interaction, game) => {
+  // Step: Edit the reply with the updated embed
+  const embed = createSpyFallInvitationEmbed(
+    game.commander, // Use the original host
+    game.expiresAt, // Use the stored expiration time
+    game.players,
+    MINIMUM_PLAYER
+  );
+
+  // Step: Add button
+  const rows = _createPreGameButton(game.messageId, game.players);
+
+  // Step: Edit the reply with the updated embed
+  await interaction.editReply({ embeds: [embed], components: rows });
+};
+
+const _createPreGameButton = (messageId, playerLists = []) => {
   const rows = [];
   const button = new ActionRowBuilder().addComponents([
     new ButtonBuilder()

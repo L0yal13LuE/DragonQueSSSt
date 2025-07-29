@@ -357,19 +357,6 @@ const createAssembleFinalEmbed = (
     .setTimestamp(null);
 };
 
-// const createSpyFallInvitationEmbed = (commander, expiresAt) => {
-//   return createBaseEmbed({
-//     color: 0xdc143c, // Crimson red
-//     title: "🕵️ Spyfall Player Recruitment",
-//     description:
-//       `A secret game of deduction and deception is about to begin...\n\n` +
-//       `👤 **Host:** ${commander.toString()}\n` +
-//       `📢 Looking for agents to join the mission!\n\n` +
-//       `⏳ **Starting in:** <t:${expiresAt}:R>`,
-//     footer: { text: "Minimum 3 players required to start the game." },
-//   });
-// };
-
 const createSpyFallInvitationEmbed = (
   commander,
   expiresAt,
@@ -377,8 +364,9 @@ const createSpyFallInvitationEmbed = (
   minPlayer = 3
 ) => {
   const playerList =
-    players.map((id, index) => `\`${index + 1}\` <@${id}>`).join("\n") ||
-    "*No one has joined yet.*";
+    players
+      .map((player, index) => `\`${index + 1}\` <${player.user}>`)
+      .join("\n") || "*No one has joined yet.*";
 
   return createBaseEmbed({
     color: 0xdc143c, // Crimson red
@@ -389,6 +377,21 @@ const createSpyFallInvitationEmbed = (
       `⏳ **Game starts:** <t:${expiresAt}:R>\n` +
       `🔘 Press **Join Game** below to enlist.`,
     footer: { text: `Minimum ${minPlayer} players required.` },
+    timestamp: new Date(),
+  });
+};
+
+const createSpyFallRoleDMEmbed = () => {
+  return createBaseEmbed({
+    color: 0x1e90ff, // Dodger Blue
+    title: "🕵️ Spyfall - Your Role",
+    description: `🎯 You are **NOT** the spy!
+
+📍 The secret location is: **||{location}||**
+👥 Total players: **{totalPlayers}**
+
+💬 Blend in and keep the conversation flowing.
+🤐 Be careful not to reveal too much — the spy is listening!`,
     timestamp: new Date(),
   });
 };
@@ -412,4 +415,5 @@ module.exports = {
   createAssembleFinalEmbed,
   createGameInvatationEmbed,
   createSpyFallInvitationEmbed,
+  createSpyFallRoleDMEmbed,
 };

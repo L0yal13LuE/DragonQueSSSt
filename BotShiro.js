@@ -308,32 +308,36 @@ client.on("messageCreate", async (message) => {
     const command = args.shift().toLowerCase();
 
     switch (command) {
-      // case "announce": {
-      //   const userList = [
-      //     "934741477316259880",
-      //     "635445458239619087", // me
-      //     "477494817568325640", // camel
-      //     "727372637927374869", // pd
-      //     "310286654713888779", // moss
-      //     "781862148363649024", // light
-      //     "251346127901818880", // gunsk
-      //     "692020038328254604", // pan
-      //     "886223513139159060" // moo
-      //   ]; // Add more user IDs
+      case "announce": {
+        const userList = [
+          // "934741477316259880",
+          // "635445458239619087", // me
+          // "477494817568325640", // camel
+          // "727372637927374869", // pd
+          // "310286654713888779", // moss
+          // "781862148363649024", // light
+          // // "251346127901818880", // gunsk
+          // // "692020038328254604", // pan
+          // "886223513139159060", // moo
+          "753882692936007730", // boss
+          // "570580005684248592" // code
+        ]; // Add more user IDs
 
-      //   for (const userId of userList) {
-      //     try {
-      //       const user = await client.users.fetch(userId); // Fetch the user
-      //       await user.send("📢 คำเตือน อยู่ให้ห่างจากคนหลายใจ อยู่ให้ห่างจาก CodenameA");
-      //     } catch (error) {
-      //       console.error(
-      //         `❌ Failed to send DM to user ${userId}:`,
-      //         error.message
-      //       );
-      //     }
-      //   }
-      //   break;
-      // }
+        for (const userId of userList) {
+          try {
+            const user = await client.users.fetch(userId); // Fetch the user
+            await user.send(
+              "📢 สุ่ม Roles เสร็จแล้ว \n Role ในเกมนี้ของคุณคือ ||คนหลายใจ||\nรีบไปเข้าประชุม แล้วอย่าให้โดนเค้าโหวตออกซะล่ะ"
+            );
+          } catch (error) {
+            console.error(
+              `❌ Failed to send DM to user ${userId}:`,
+              error.message
+            );
+          }
+        }
+        break;
+      }
       case "rank":
       case "level":
         commandHandlers.handleRankCommand(message);
@@ -432,11 +436,11 @@ client.on("messageCreate", async (message) => {
     // --- END BOT MENTION CHECK ---
 
     // Pass necessary dependencies and the state reference object
-    await gameLogic.handleExpGain(
-      message,
-      userCooldowns,
-      currentMonsterStateRef
-    );
+    // await gameLogic.handleExpGain(
+    //   message,
+    //   userCooldowns,
+    //   currentMonsterStateRef
+    // );
   }
 
   // Role Logging
@@ -576,7 +580,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       },
       {
         prefix: "SPYFALL",
-        handler: (i) => handleSpyFallButton(i),
+        handler: (i, client) => handleSpyFallButton(i, client),
       },
     ];
 
@@ -586,7 +590,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         interaction.customId.startsWith(h.prefix)
       );
       if (matched) {
-        await matched.handler(interaction);
+        await matched.handler(interaction, client);
       }
       return;
     }
