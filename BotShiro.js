@@ -71,6 +71,7 @@ const {
   handleCraftListInteraction,
   handleCraftListButtonClick,
 } = require("./managers/craftPaginationManager.js");
+const fortuneTeller = require('./managers/fortuneTeller'); 
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -385,18 +386,30 @@ client.on("messageCreate", async (message) => {
     // Check if the bot user was specifically mentioned (not @everyone or a role)
     if (message.mentions.has(client.user) && !message.mentions.everyone) {
       // Select a random cat reply
-      const randomIndex = Math.floor(
-        Math.random() * CONSTANTS.catReplies.length
-      );
-      const replyText = CONSTANTS.catReplies[randomIndex];
-      try {
-        await message.reply(replyText);
-        console.log(
-          `[${message.author.username}] Mentioned the bot. Replied with: ${replyText}`
-        );
-      } catch (error) {
-        console.error("Error sending cat reply:", error);
+      // const randomIndex = Math.floor(
+      //   Math.random() * CONSTANTS.catReplies.length
+      // );
+      // const replyText = CONSTANTS.catReplies[randomIndex];
+      // try {
+      //   await message.reply(replyText);
+      //   console.log(
+      //     `[${message.author.username}] Mentioned the bot. Replied with: ${replyText}`
+      //   );
+      // } catch (error) {
+      //   console.error("Error sending cat reply:", error);
+      // }
+      // return;
+
+      // New AI calling perk
+      // Enqueue the request using the exported function
+      const currentQueueSize = fortuneTeller.enqueueRequest(message);
+      console.log(`[Fortune] Added request from ${message.author.tag} to the queue. Queue length: ${currentQueueSize}`);
+      if (currentQueueSize > 1 && !fortuneTeller.getIsProcessingQueue()) {
+          await message.reply("⏳ I'm currently consulting the celestial spheres for another's destiny. Please wait a moment, I'll get to your fortune as soon as possible!");
+      } else if (!fortuneTeller.getIsProcessingQueue()) {
+          await message.channel.sendTyping(); 
       }
+      fortuneTeller.processQueue();
       return;
     }
     // --- END BOT MENTION CHECK ---
