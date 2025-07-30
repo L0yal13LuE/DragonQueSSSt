@@ -377,22 +377,15 @@ const createSpyFallInvitationEmbed = (
       `⏳ **Game starts:** <t:${expiresAt}:R>\n` +
       `🔘 Press **Join Game** below to enlist.`,
     footer: { text: `Minimum ${minPlayer} players required.` },
-    timestamp: new Date(),
   });
 };
 
-const createSpyFallRoleDMEmbed = () => {
+const createSpyFallRoleDMEmbed = (item, messageLink) => {
   return createBaseEmbed({
     color: 0x1e90ff, // Dodger Blue
-    title: "🕵️ Spyfall - Your Role",
-    description: `🎯 You are **NOT** the spy!
-
-📍 The secret location is: **||{location}||**
-👥 Total players: **{totalPlayers}**
-
-💬 Blend in and keep the conversation flowing.
-🤐 Be careful not to reveal too much — the spy is listening!`,
-    timestamp: new Date(),
+    title: "🕵️ Spyfall - Pre Game Role Announcement",
+    description:
+      `📢 Your role is: **||${item}||**` + `\nHere’s your link: ${messageLink}`,
   });
 };
 

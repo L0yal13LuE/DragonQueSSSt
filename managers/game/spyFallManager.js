@@ -6,12 +6,6 @@ const {
 } = require("discord.js");
 
 const {
-  getCachedData,
-  saveCachedData,
-  deleteCachedData,
-} = require("../../providers/cacheProvider");
-
-const {
   createSpyFallInvitationEmbed,
   createSpyFallRoleDMEmbed,
 } = require("../embedManager");
@@ -160,12 +154,14 @@ const _handleStartButton = async (interaction, game, client) => {
   game.players = players;
   spyFallGame.set(gameKey, game); // Update the game state in the map
 
+  const messageLink = `https://discord.com/channels/${game.preGameMessage.guildId}/${game.preGameMessage.channelId}/${game.preGameMessage.id}`;
+
   for (const player of game.players) {
     try {
-      const message = createSpyFallRoleDMEmbed();
+      const embed = createSpyFallRoleDMEmbed(player.item, messageLink);
 
       const user = await client.users.fetch(player.user.id); // Fetch the user
-      await user.send(message);
+      await user.send({ embeds: [embed] });
     } catch (error) {
       console.error(`❌ Failed to send DM to user ${userId}:`, error.message);
     }
@@ -232,6 +228,7 @@ const handleSpyFallCommand = async (interaction) => {
     commander: commander,
     players: initialPlayerPool,
     messageId: replyMessage.id,
+    preGameMessage: replyMessage,
     expiresAt: expiresAt,
   });
 
