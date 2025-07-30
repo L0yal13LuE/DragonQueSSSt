@@ -11,6 +11,9 @@ const {
   deductItemFromUser,
   addItemtoUser,
 } = require("./managers/materialManager");
+
+const { announceItemTransfer } = require("./announcements");
+
 const { MessageFlags } = require("discord.js");
 
 const handleSendCommand = async (interaction) => {
@@ -58,9 +61,7 @@ const fetchUserItem = async (interaction) => {
       } else {
         // 2. Cache miss: Fetch all items (amount >= 1) for the user from DB
         // Pass page 0 and limit -1 to fetch all items according to our modification in getUserItem
-        const result = await getUserItem(
-          { userId: userId, amount: 1 }
-        );
+        const result = await getUserItem({ userId: userId, amount: 1 });
 
         if (result.error || !result.data) {
           console.error(
@@ -239,17 +240,18 @@ const handleSendCommandSubmission = async (interaction) => {
         return;
       }
 
-      // await interaction.editReply(
-      await interaction.channel.send(
-        `✅ **${sender.username}** sent **${amount}** ${materialToSend.emoji} **${materialToSend.name}** to **${receiver.username}**!`
-      );
-      Promise.all([
-        deleteCachedData(userBagKey),
-      ])
+      announceItemTransfer(receiver, materialToSend, amount, sender);
+
+      await interaction.editReply({
+        content: `You have successfully sent x ${amount} ${materialToSend.rarity.emoji} ${materialToSend.name} ${materialToSend.emoji} to ${receiver.username}.`,
+      });
+
+      Promise.all([deleteCachedData(userBagKey)])
         .then(() => {
           console.log(
             `[Cache] Cleared bag cache for sender ${sender.id} after successful send.`
           );
+          return;
         })
         .catch((cacheErr) => {
           console.error("[Cache] Error clearing caches after send:", cacheErr);

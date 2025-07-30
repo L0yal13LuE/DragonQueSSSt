@@ -1,15 +1,102 @@
 // managers/craftManager.js
 
 // --- Required Libraries ---
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { supabase } = require('../supabaseClient');
 const { createBaseEmbed } = require("./embedManager");
 const { getUserItem, updateUserItem, insertUserItem } = require("./../providers/materialProvider");
+// const { createCanvas, loadImage } = require('canvas');
+
+// async function generateCraftingTableImage(recipes) {
+//     const MAX_MATERIALS = 10;
+//     const PADDING = 15;
+
+//     const COLOR_WHITE = '#FFFFFF';
+//     const COLOR_BLACK = '#000000';
+
+//     // --- ADJUSTMENTS HERE ---
+//     const LINE_HEIGHT = 25; // Increased from 25 for bigger row gap
+//     const FONT_SIZE = 14;   // Decreased from 18 for smaller text
+//     const HEADER_FONT_SIZE = 16; // Decreased from 20 for smaller header text
+//     // --- END ADJUSTMENTS ---
+
+//     // --- Calculate dynamic column widths (logic unchanged, but will scale with new FONT_SIZE) ---
+//     let maxItemNameLength = 'Crafted Item'.length;
+//     const materialColumnWidths = Array(MAX_MATERIALS).fill(0).map((_, i) => `Material ${i + 1}`.length);
+
+//     recipes.forEach(recipe => {
+//         if (recipe.item.length > maxItemNameLength) {
+//             maxItemNameLength = recipe.item.length;
+//         }
+//         recipe.materials.forEach((mat, index) => {
+//             if (index < MAX_MATERIALS && mat.length > materialColumnWidths[index]) {
+//                 materialColumnWidths[index] = mat.length;
+//             }
+//         });
+//     });
+
+//     // Adjust CHAR_WIDTH_FACTOR if necessary for precise alignment with new font size
+//     const CHAR_WIDTH_FACTOR = 9; // Might need fine-tuning for 16px font
+//     const ITEM_COL_WIDTH = maxItemNameLength * CHAR_WIDTH_FACTOR + PADDING * 2;
+//     const MATERIAL_COL_WIDTHS = materialColumnWidths.map(len => len * CHAR_WIDTH_FACTOR + PADDING * 2);
+
+//     const TABLE_WIDTH = ITEM_COL_WIDTH + MATERIAL_COL_WIDTHS.reduce((sum, w) => sum + w, 0);
+//     const TABLE_HEIGHT = (recipes.length + 1) * LINE_HEIGHT + PADDING * 2;
+
+//     const canvas = createCanvas(TABLE_WIDTH, TABLE_HEIGHT);
+//     const ctx = canvas.getContext('2d');
+
+//     // --- Drawing logic (mostly unchanged, but uses new constants) ---
+//     ctx.fillStyle = COLOR_WHITE; // bg color
+//     ctx.fillRect(0, 0, TABLE_WIDTH, TABLE_HEIGHT);
+
+//     ctx.fillStyle = COLOR_BLACK; // font color
+//     ctx.font = `${HEADER_FONT_SIZE}px sans-serif`;
+//     let currentX = PADDING;
+//     let currentY = PADDING + HEADER_FONT_SIZE;
+
+//     ctx.fillText('Crafted Item', currentX, currentY);
+//     currentX += ITEM_COL_WIDTH;
+
+//     for (let i = 0; i < MAX_MATERIALS; i++) {
+//         ctx.fillText(`Material ${i + 1}`, currentX, currentY);
+//         currentX += MATERIAL_COL_WIDTHS[i];
+//     }
+
+//     ctx.strokeStyle = '#5865F2'; // table line color
+//     ctx.lineWidth = 2;
+//     ctx.beginPath();
+//     ctx.moveTo(0, currentY + PADDING / 2);
+//     ctx.lineTo(TABLE_WIDTH, currentY + PADDING / 2);
+//     ctx.stroke();
+
+//     currentY += LINE_HEIGHT + PADDING / 2;
+
+//     ctx.font = `${FONT_SIZE}px sans-serif`;
+//     recipes.forEach(recipe => {
+//         currentX = PADDING;
+//         ctx.fillStyle = COLOR_BLACK; // font color 
+
+//         ctx.fillText(recipe.item, currentX, currentY);
+//         currentX += ITEM_COL_WIDTH;
+
+//         for (let i = 0; i < MAX_MATERIALS; i++) {
+//             const material = recipe.materials[i] || '';
+//             ctx.fillText(material, currentX, currentY);
+//             currentX += MATERIAL_COL_WIDTHS[i];
+//         }
+//         currentY += LINE_HEIGHT;
+//     });
+
+//     return canvas.toBuffer('image/png');
+// }
 
 // handle when user run !craft command
 const handleCraftCommand = async (message, args) => {
     try {
 
         const userId = message.author.id;
+        const clanNumber = Number(args.clanNumber) || 0; // requried to separate normal craft and clan craft
 
         const autoClose = 5;
         const autoCloseTimer = (autoClose * 60) * 1000;
@@ -26,15 +113,17 @@ const handleCraftCommand = async (message, args) => {
         const lettesArray = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
         args.items.forEach((item, index) => {
             // Add the item as a field to the embed
-            let itemLetter = lettesArray[index];
-            const materialRowArray = item.materials.map(row => `${row.materials.emoji} ${row.materials.name} x ${row.amount}`);
-            // main row
-            const mainrow = {
-                name: `:regional_indicator_${itemLetter.toLowerCase()}: — ${item.emoji} ${item.name}`, // Combine emoji and item name for the field name
-                value: `Required: ${materialRowArray.join(", ")}`, // Display the price in the value
-                inline: false // Set to true to display items side-by-side if they fit (up to 3 per row usually)
-            };
-            baseEmbed.addFields(mainrow);
+            if (item.materials.length != 0) {
+                let itemLetter = lettesArray[index];
+                const materialRowArray = item.materials.map(row => `${(row.materials.emoji.indexOf('?') > -1) ? '⚪️' : row.materials.emoji} ${row.materials.name} x ${row.amount}`);
+                // main row
+                const mainrow = {
+                    name: `:regional_indicator_${itemLetter.toLowerCase()}: — ${item.emoji.indexOf('?') > -1 ? '⚪️' : item.emoji} ${item.name}`,
+                    value: `Required: ${materialRowArray.join(", ")}`,
+                    inline: false
+                };
+                baseEmbed.addFields(mainrow);
+            }
         });
 
         baseEmbed.addFields({
@@ -43,25 +132,37 @@ const handleCraftCommand = async (message, args) => {
             inline: false
         });
 
+
+        /*// ---- 2.5 image for embed
+        const craftingRecipes = args.items.map((item, index) => ({
+            item: `[${lettesArray[index]}] ${item.name}`,
+            materials: item.materials.map(row => row.materials.name)
+        }));
+        const imageBuffer = await generateCraftingTableImage(craftingRecipes);
+        const attachment = new AttachmentBuilder(imageBuffer, { name: 'crafting_recipes.png' });*/
+
         // --- 3. Create Buttons for each item ---
         let rows = [];
         let currentRow = new ActionRowBuilder();
+        let buttonPrefix = 'craft_'; // default prefix for normal craft
+        if (clanNumber && clanNumber > 0) buttonPrefix = 'craftclan_'; // prefix for clan craft
         args.items.forEach((item, index) => {
-            // const uniqueItemId = `${item.name}`;
-            let itemLetter = lettesArray[index];
-            let button = new ButtonBuilder()
-                .setCustomId(`craft_${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}_${userId}`)
-                .setLabel(itemLetter) // Button text
-                .setStyle(ButtonStyle.Primary); // Use a primary button style
+            if (item.materials.length != 0) {
+                let itemLetter = lettesArray[index];
+                let button = new ButtonBuilder()
+                    .setCustomId(`${buttonPrefix}${itemLetter}@${Math.floor(100000 + Math.random() * 900000)}_${userId}`)
+                    .setLabel(itemLetter) // Button text
+                    .setStyle(ButtonStyle.Primary); // Use a primary button style
 
-            // Add button to the current row
-            currentRow.addComponents(button);
+                // Add button to the current row
+                currentRow.addComponents(button);
 
-            // If the current row has 5 buttons or it's the last item, push the row and start a new one
-            if (currentRow.components.length === 5 || index === args.items.length - 1) {
-                rows.push(currentRow);
-                if (index < args.items.length - 1) { // Don't create a new row if it's the very last item
-                    currentRow = new ActionRowBuilder();
+                // If the current row has 5 buttons or it's the last item, push the row and start a new one
+                if (currentRow.components.length === 5 || index === args.items.length - 1) {
+                    rows.push(currentRow);
+                    if (index < args.items.length - 1) { // Don't create a new row if it's the very last item
+                        currentRow = new ActionRowBuilder();
+                    }
                 }
             }
         });
@@ -69,18 +170,19 @@ const handleCraftCommand = async (message, args) => {
         // --- 4. Send Embed with Buttons ---
         let reply = await message.reply({
             embeds: [baseEmbed],
-            components: rows, // Attach the action rows containing the buttons
+            components: rows,
+            // files: [attachment]
         });
 
         // --- 5. Delete the message after 5 minute ---
-        let openCrafTimer = setTimeout(async () => {
-            clearTimeout(openCrafTimer);
+        let instanceTimeout = setTimeout(async () => {
+            clearTimeout(instanceTimeout);
             try {
                 await reply.delete();
             } catch (errorDel) {
                 console.error('Error deleting message:', errorDel);
             }
-            await message.reply('**Crafting session closed.** Use `!craft` to open again.');
+            // await message.reply('*Craft session closed.*');
         }, autoCloseTimer);
     } catch (error) {
         console.error('Error sending shop embed with buttons:', error);
@@ -96,14 +198,18 @@ const handleCraftButtonClick = async (interaction, args) => {
     const userId = interaction.user.id;
     const username = interaction.user.username;
 
-    // Check if the button custom ID starts with 'craft_', indicating a shop purchase attempt
-    if (interaction.customId.startsWith('craft_')) {
+    let buttonPrefix = 'craft_'; // default prefix for normal craft
+    const clanNumber = Number(args.clanNumber) || 0;
+    if (clanNumber && clanNumber > 0) buttonPrefix = 'craftclan_';
+
+    // Check if the button custom ID starts with `buttonPrefix`, indicating a shop purchase attempt
+    if (interaction.customId.startsWith(buttonPrefix)) {
 
         // Defer the reply to prevent interaction timeout, reply is only visible to the user
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         // Extract the item 
-        const itemToBuyNameA = interaction.customId.replace('craft_', '').replace(/_/g, '');
+        const itemToBuyNameA = interaction.customId.replace(buttonPrefix, '').replace(/_/g, '');
         const itemToBuyName = itemToBuyNameA.split('@')[0];
         const itemToCraft = args.items.find(item => item.letter === itemToBuyName);
 
@@ -165,12 +271,10 @@ const handleCraftButtonClick = async (interaction, args) => {
         const isValid = resultPrepareItem.every(item => item.valid);
         if (isValid) {
 
-            // console.log("resultPrepareItem: ", resultPrepareItem);
-
             // update item
             let allUpdated = true, allUpdateResult = [];
             await Promise.all(resultPrepareItem.map(async ({ amount_owned, amount_new, userItemMatch }) => {
-                const userUpdObj = { id: userId };
+                const userUpdObj = { id: userId, username: username };
                 const resultUpdate = await updateUserItem(userUpdObj, userItemMatch, amount_new);
                 allUpdateResult.push(resultUpdate);
                 if (!resultUpdate) allUpdated = false;
@@ -194,27 +298,64 @@ const handleCraftButtonClick = async (interaction, args) => {
                     const userInsObj = { id: reqMaterialID, name: reqMaterialName };
                     craftSuccess = await insertUserItem(userUpdObj, userInsObj, 1);
                 }
-                
+
                 if (craftSuccess) {
                     // announce message to user/channel
-                    await interaction.editReply(`Success: You crafted **${itemToCraft.emoji} ${itemToCraft.name}**`);
-                    interaction.channel.send(`<@${userId.toString()}> crafted: ${itemToCraft.emoji} ${itemToCraft.name}`);
+                    await interaction.editReply(`Success: You crafted **${itemToCraft.name}**`);
+                    // interaction.channel.send(`<@${userId.toString()}> crafted: ${itemToCraft.emoji} ${itemToCraft.name}`);
                 } else {
                     // insert failed
-                    await interaction.editReply(`Fail: You crafted **${itemToCraft.emoji} ${itemToCraft.name}** but failed to insert new item. (ER-2)`);
+                    await interaction.editReply(`Fail: You crafted **${itemToCraft.name}** but failed to insert new item. (ER-2)`);
                 }
             } else {
                 // deduct item fail
-                await interaction.editReply(`Fail: You crafted **${itemToCraft.emoji} ${itemToCraft.name}** but failed to to deduct material. (ER-1)`);
+                await interaction.editReply(`Fail: You crafted **${itemToCraft.name}** but failed to to deduct material. (ER-1)`);
             }
             //await interaction.editReply(`This feature coming soon! (crafting ${itemToCraft.emoji} ${itemToCraft.name})\nStay tuned! for upcoming features!🤗`);
         } else {
-            await interaction.editReply(`Fail: You don't have enough material to craft **${itemToCraft.emoji} ${itemToCraft.name}**.`);
+            // not enough material
+            // show what they don't have
+            const invalidMaterials = resultPrepareItem.filter(item => !item.valid);
+            const missingMaterials = invalidMaterials.map(item => `> ${item.name} (**${item.amount_owned}**/${item.amount})`).join('\n');
+            await interaction.editReply(`You don't have enough material to craft **${itemToCraft.name}**.\nMissing: \n${missingMaterials}\nComeback again when you have the required materials!`);
         }
     }
 }
+
+const clanCraftChannels = async (clanNumber) => {
+    try {
+        const channelData = await getChannelIdForClanCraft(clanNumber);
+        if (!channelData) return null;
+        return channelData;
+    } catch (error) {
+        console.error(`Unexpected error fetching crafts for ${clanNumber}:`, error);
+        return null;
+    }
+}
+
+const getChannelIdForClanCraft = async (clanNumber) => {
+    try {
+        const { data: channelsData, error } = await supabase.from('craft_clan')
+            .select('*')
+            .eq('number', clanNumber)
+            .eq('is_active', true);
+
+        if (error) {
+            console.error(`Error fetching channel for clan ${clanNumber}:`, error.message);
+            return false;
+        }
+
+        return channelsData;
+    } catch (error) {
+        console.error(`Unexpected error fetching channel for ${clanNumber}:`, error);
+        return false;
+    }
+}
+
+
 // --- Command Export ---
 module.exports = {
     handleCraftCommand,
-    handleCraftButtonClick
+    handleCraftButtonClick,
+    clanCraftChannels
 };

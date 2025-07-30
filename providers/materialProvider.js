@@ -6,7 +6,9 @@ const getMaterial = async (filters = {}) => {
       console.error("Supabase client not available in getMaterial");
       return null;
     }
-    let query = supabase.from("materials").select("*");
+    let query = supabase
+      .from("materials")
+      .select("*, rarity:rarities(name, drop_rate, emoji)");
 
     // Dynamically apply filters if provided
     if ("is_active" in filters) {
@@ -97,11 +99,16 @@ const getUserItem = async (filters = {}) => {
     let query = supabase
       .from("user_material")
       .select(
-        "id, amount, material:materials(id, name, emoji, rarity_id, rarities(id, name, emoji, drop_rate))"
+        "id, user_id, amount, material:materials(id, name, emoji, rarity_id, rarities(id, name, emoji, drop_rate, value))"
       );
 
     if ("userId" in filters) {
       query = query.eq("user_id", filters.userId);
+    }
+
+    if("userIdList" in filters)
+    {
+      query = query.in("user_id", filters.userIdList);
     }
 
     if ("itemId" in filters) {
@@ -120,8 +127,10 @@ const getUserItem = async (filters = {}) => {
       );
     }
 
-    // ✅ Sort by material name
-    data.sort((a, b) => a.material.name.localeCompare(b.material.name));
+    if (data && data.length > 0) { // fixed error when no data
+      // ✅ Sort by material name
+      data.sort((a, b) => a.material.name.localeCompare(b.material.name));
+    }
 
     return data;
   } catch (error) {
