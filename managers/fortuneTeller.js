@@ -232,8 +232,7 @@ async function processQueue() {
 
     try {
         const fortune = await getFortuneFromAI(message.content); // Pass user's message content directly
-        // Add empty async/wait wait for 2 seconds
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 700)); // add some delay to prevent too fast response
         await thinkingMessage.edit(fortune);
     } catch (error) {
         console.error("[Fortune] An unexpected error occurred during queue processing:", error);
