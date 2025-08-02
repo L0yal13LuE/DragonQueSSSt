@@ -71,6 +71,9 @@ const {
   handleCraftListInteraction,
   handleCraftListButtonClick,
 } = require("./managers/craftPaginationManager.js");
+const {
+  handlePetCommand
+} = require("./managers/petManager.js");
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -579,6 +582,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         break;
       case "game-assemble-xx":
         await handleAssembleCommand(interaction); // Keep using the imported manager
+        break;
+      case "pet":
+        await handlePetCommand(interaction); // Handle pet command
         break;
     }
   } catch (error) {
