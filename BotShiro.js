@@ -585,7 +585,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     ];
 
     // Usage
-    if (interaction.isButton()) {
+    if (interaction.isButton() || interaction.isStringSelectMenu()) {
       const matched = buttonHandlers.find((h) =>
         interaction.customId.startsWith(h.prefix)
       );
