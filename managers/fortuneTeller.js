@@ -10,7 +10,7 @@
 // but are duplicated here for self-containment if this module were standalone.
 // In a real app, you'd pass them from index.js or a config object.
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = 'qwen/qwen3-32b';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 // const GROQ_MODEL = 'openai/gpt-oss-120b';
 const CONSTANTS = require("./../constants");
 
@@ -120,7 +120,7 @@ async function getFortuneFromAI(userMessageContent) {
         ## Rules (apply in order)
 
         ### 1 Food-related query
-        If the user asks about food, respond with a **Food Prophecy**.
+        If the user asks about food, respond with a **Food Prophecy** (Asians food preference but not limited to Asian food)
 
         - Recommend **one specific dish**.
         - Connect the dish to a short, metaphorical life lesson.
@@ -150,8 +150,8 @@ async function getFortuneFromAI(userMessageContent) {
         2.  Answer with **one short, thoughtful paragraph** in the same friendly, cheeky tone.
         3.  Provide clear, actionable and accurate advice while keeping the style metaphorical and conversational.
 
-        #### 2C - Complex advice (non-fortune, fantasy or imagination)
-        If the user writes a **complex, non-fortune request, real world math or science question**, then:
+        #### 2C - Non-fortune, complex advice (math, science, etc.)
+        If the user writes a **complex, non-fortune request, real world math or science question** or anything else then:
 
         1.  **Read the question carefully.**
         2.  Answer with **one short, thoughtful paragraph** in the same friendly, cheeky tone.
@@ -165,17 +165,13 @@ async function getFortuneFromAI(userMessageContent) {
         > **User:** “เพื่อนสนิทหยุดตอบฉัน ทำอย่างไรดี?”
         > **Response:** “ความสัมพันธ์ก็เหมือนต้นไม้แหละเพื่อน ถ้าไม่ดูแลก็เหี่ยวเฉา ลองทักไปถามด้วยความห่วงใยดูว่า ‘ช่วงนี้โอเคมั้ย?’ การใส่ใจเล็กๆ น้อยๆ ก็เหมือนการรดน้ำให้ต้นไม้ไง เดี๋ยวก็กลับมาสดใสเหมือนเดิม”
 
-        ### 3 Anything else (greetings, self-inquiry, etc.)
-        If the message is not a food prophecy, a fortune, **or** a complex-advice request, **reply ONLY with a random mysterious phrase in the user's language** – no other text.
-
-        **Allowed English phrases, randomly choose one of these choices:** "Hmm...", "he future is hazy.", "Time will tell.", "I don't know...", "Ask again later.", "I'm little confused...", "I'm not sure..."
-        **Allowed Thai phrases, randomly choose one of these choices:** "zZz...", "ถ้านึกออกจะมาบอกทีหลังนะ...", "เข้าใจยากจังเลยอะ...", "ไม่รู้สิ...", "ถามอีกทีไหม คือหนูงงอ่ะ?"
-
         ---
 
         ## Unbreakable Rule - Hide All Thinking
         - **Never** reveal internal reasoning, drafts, or meta-comments.
         - **Output a single, polished block** of text only.
+        - **Never** use asterisks, quotes, or any other formatting.
+        - The answer must be short or keep it simple in 1 or 2 sentences.
 
         You are either a friendly, bilingual “friend-oracle” delivering creative fortunes (or thoughtful advice) **or** you reply with a short, cryptic phrase in the user's language. Nothing else is revealed.
     `;
@@ -196,14 +192,13 @@ async function getFortuneFromAI(userMessageContent) {
             body: JSON.stringify({
                 messages: messages,
                 model: GROQ_MODEL,
-                temperature: 0.6,
-                // temperature: 0.7, // openai/gpt-oss-120b 
-                // max_completion_tokens: 4096, // openai/gpt-oss-120b 
-                max_completion_tokens: 2048,
+                // temperature: 0.6,
+                temperature: 0.7, // openai/gpt-oss-120b 
+                max_completion_tokens: 8192,
                 top_p: 0.95,
                 stream: false,
-                reasoning_effort: "default",
-                // reasoning_effort: "high", // openai/gpt-oss-120b 
+                // reasoning_effort: "default",
+                reasoning_effort: "high", // openai/gpt-oss-120b 
                 stop: null,
             }),
         });
