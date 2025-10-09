@@ -22,8 +22,8 @@ const petCommands = [
     .setDescription("Pet farming commands")
     .addSubcommand((subcommand) =>
       subcommand
-        .setName("rent")
-        .setDescription("Rent a pet for farming")
+        .setName("buy")
+        .setDescription("Buy a pet for farming")
         .addStringOption((option) =>
           option
             .setName("pet_type")
@@ -32,7 +32,37 @@ const petCommands = [
             .addChoices(
               { name: "Cat", value: "cat" },
               { name: "Chicken", value: "chicken" },
-              { name: "Bird", value: "bird" }
+              { name: "Bird", value: "bird" },
+              { name: "Wolf", value: "wolf" },
+              { name: "Hamster", value: "hamster" },
+              { name: "Panda", value: "panda" },
+              { name: "Monkey", value: "monkey" },
+              { name: "Turtle", value: "turtle" },
+              { name: "Parrot", value: "parrot" },
+              { name: "Fox", value: "fox" },
+            )
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("send")
+        .setDescription("Send your pet to farming")
+        .addStringOption((option) =>
+          option
+            .setName("pet_type")
+            .setDescription("select pet (you need to owned it)")
+            .setRequired(true)
+            .addChoices(
+              { name: "Cat", value: "cat" },
+              { name: "Chicken", value: "chicken" },
+              { name: "Bird", value: "bird" },
+              { name: "Wolf", value: "wolf" },
+              { name: "Hamster", value: "hamster" },
+              { name: "Panda", value: "panda" },
+              { name: "Monkey", value: "monkey" },
+              { name: "Turtle", value: "turtle" },
+              { name: "Parrot", value: "parrot" },
+              { name: "Fox", value: "fox" },
             )
         )
     )
