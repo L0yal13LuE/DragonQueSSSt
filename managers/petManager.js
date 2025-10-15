@@ -11,8 +11,9 @@
 
 // const { MessageFlags } = require('discord.js');
 const { supabase } = require("../supabaseClient");
+const { createBaseEmbed } = require("./embedManager");
 // const CONSTANTS = require("../constants");
-const { getMaterial, updateUserItem } = require("../providers/materialProvider");
+const { getMaterial, updateUserItem, getUserItem } = require("../providers/materialProvider");
 
 // --- Constants for Pet Farming ---
 
@@ -41,6 +42,9 @@ let cacheLastLoaded = null;
 
 /** @const {number} The duration in minutes before the material cache expires. */
 const CACHE_EXPIRY_MINUTES = 60;
+
+// base factor level ratio (for level up)
+const baseFactorLevel = 1.0;
 
 
 /**
@@ -190,9 +194,14 @@ const deductCurrency = async (userId) => {
     if (userMaterial.amount < PET_COST) {
         return false; // Should be caught by hasEnoughCurrency, but as a safeguard.
     }
-
     const newAmount = userMaterial.amount - PET_COST;
-    return await updateUserItem({ id: userId }, userMaterial, newAmount);
+    const userItem = await getUserItem(
+        {
+            userId: userId.toString(),
+            itemId: COMO_MATERIAL_ID
+        });
+    const userItemMatch = userItem?.[0];
+    return await updateUserItem({ id: userId.toString() }, userItemMatch, newAmount);
 };
 
 /**
@@ -202,6 +211,74 @@ const deductCurrency = async (userId) => {
  */
 const getCurrentDate = () => {
     return new Date();
+};
+
+/**
+ * Creates an embed for displaying pet status information.
+ *
+ * @param {Object} user - The Discord user object.
+ * @param {Array} pets - Array of user's pets.
+ * @param {Object} activePet - The active pet object.
+ * @param {Object} returningInfo - Information about the active pet's journey.
+ * @returns {Object} Discord embed object.
+ */
+const createPetStatusEmbed = (user, pets, activePet, returningInfo) => {
+    // Create base embed
+    const embed = createBaseEmbed({
+        color: 0x4CAF50, // Green color
+        title: `� ${user.username}'s Pet Status �`,
+        description: "Here's the status of your pets:"
+    });
+
+    // Add active pet information
+    if (activePet) {
+        embed.addFields(
+            {
+                name: `� Active Pet: ${activePet.pet_type.toUpperCase()}`,
+                value: `Level: **${activePet.level}**\nEXP: **${activePet.exp}**\n\n` +
+                    `Started: *${returningInfo.startDate}*\n` +
+                    `Returns: *${returningInfo.endDate}*\n` +
+                    `Time left: **${Math.ceil(returningInfo.hourLeft)} hours**`,
+                inline: false
+            }
+        );
+
+        if (returningInfo.hourLeft <= 0) {
+            embed.addFields({
+                name: "✅ Journey Complete",
+                value: "You can **recall** your pet now to get your rewards!",
+                inline: false
+            });
+        } else {
+            embed.addFields({
+                name: "ℹ️ Journey Status",
+                value: "Your pet is still on its journey. You can recall them early, but rewards will be reduced.",
+                inline: false
+            });
+        }
+    }
+
+    // Add other pets information
+    if (pets.length > 0) {
+        let otherPetsField = { name: "� Your Other Pets", value: "", inline: false };
+
+        pets.forEach(pet => {
+            if (!activePet || pet.id !== activePet.id) {
+                otherPetsField.value += `• **${pet.pet_type}** (Level ${pet.level}, ${pet.exp} EXP) - ${pet.is_active ? "Active" : "Inactive"}\n`;
+            }
+        });
+
+        if (otherPetsField.value) {
+            embed.addFields(otherPetsField);
+        }
+    }
+
+    // Add footer with instructions
+    embed.setFooter({
+        text: "Use '/pet buy' to get a new pet | Use '/pet send' to send a pet on a journey | Use '/pet recall' to get your rewards"
+    });
+
+    return embed;
 };
 
 /**
@@ -254,13 +331,13 @@ const upsertUserItem = async (userId, item) => {
 };
 
 /**
- * Send a pet yo journey farming for items
+ * Send a pet to journey farming for items
  *
  * @param {string} userId - The Discord user ID.
- * @param {string} petType - The type of pet to rent.
+ * @param {string} petType - The type of pet to send.
  * @returns {Promise<Object>} A promise that resolves to an object with success status and a message.
  */
-const rentPet = async (userId, petType) => {
+const sendPet = async (userId, petType) => {
     if (!PET_TYPES.includes(petType)) {
         return { success: false, message: "Invalid pet type. Please choose from: " + PET_TYPES.join(', ') };
     }
@@ -279,7 +356,7 @@ const rentPet = async (userId, petType) => {
     }
 
     if (activePet) {
-        return { success: false, message: "You already have an active pet. Use `/pet status` to check on them." };
+        return { success: false, message: "You already sent your pet to a journey. You can only send one pet. Use `/pet status` to check on them." };
     }
 
     const { data: targetPet, error: checkErrorTarget } = await supabase
@@ -299,16 +376,6 @@ const rentPet = async (userId, petType) => {
         // Set up the pet's journey.
         const startTime = getCurrentDate();
         const endTime = new Date(startTime.getTime() + MAX_FARMING_HOURS * 60 * 60 * 1000);
-
-        /*
-        // TO Update in the future, avoiding feeding conflict with many pet but can only deployed 1 at the time ?
-        // Check if pet is last feed within 24 hour
-        const lastFeed = new Date(targetPet.last_feed);
-        const now = getCurrentDate();
-        const hoursPassed = Math.floor((now - lastFeed) / (1000 * 60 * 60));
-        if (hoursPassed > MAX_FARMING_HOURS) {
-            return { success: false, message: "You need to feed your pet first, using `/pet feed` command (1 Como per pet)" };
-        }*/
 
         const { error } = await supabase
             .from("user_pets")
@@ -395,32 +462,85 @@ const buyPet = async (userId, petType) => {
  * Checks the status of a user's active pet.
  *
  * @param {string} userId - The Discord user ID.
- * @returns {Promise<Object>} A promise that resolves to an object with success status and a message.
+ * @param {Object} interaction - The Discord interaction object (optional, for embeds).
+ * @returns {Promise<Object>} A promise that resolves to an object with success status, message, and optionally embed.
  */
-const checkPetStatus = async (userId) => {
-    const { data: pet, error } = await supabase
+const checkPetStatus = async (userId, interaction = null) => {
+    // Get all pets for the user
+    const { data: pets, error } = await supabase
         .from("user_pets")
         .select("*")
-        .eq("user_id", userId)
-        .eq("is_active", true)
-        .single();
+        .eq("user_id", userId);
 
     if (error) {
-        if (error.code === "PGRST116") { // No active pet found.
-            return { success: true, message: `You don't have an active pet. Rent one using \"/pet rent\" for only ${PET_COST} Como!` };
-        }
         console.error("Error checking pet status:", error);
         return { success: false, message: "Error checking your pet status. Please try again." };
     }
 
-    const returningInfo = calculateDateInfo(pet.start_time, pet.end_time);
+    if (!pets || pets.length === 0) {
+        return { success: true, message: `You don't have any pets. Rent one using \"/pet buy\" for only ${PET_COST} Como!` };
+    }
 
-    let message = `Your **${pet.pet_type}** started its journey on *${returningInfo.startDate}* and will return on *${returningInfo.endDate}*.`;
+    // Find the active pet
+    const activePet = pets.find(pet => pet.is_active);
+
+    // If we have an interaction object, create an embed
+    if (interaction) {
+        if (!activePet) {
+            // Create embed for no active pet case
+            const embed = createBaseEmbed({
+                color: 0xFFA500, // Orange color
+                title: `🐾 Your Pets 🐾`,
+                description: "You don't have an active pet. Here are your pets:"
+            });
+
+            // Add all pets to the embed
+            pets.forEach(pet => {
+                embed.addFields({
+                    name: `${pet.pet_type.toString().toUpperCase()}`,
+                    value: `Level: **${pet.level}**\nEXP: **${pet.exp}**\nStatus: ${pet.is_active ? "Active" : "Inactive"}`,
+                    inline: true
+                });
+            });
+
+            return { success: true, embed };
+        } else {
+            // For active pet, create detailed embed
+            const returningInfo = calculateDateInfo(activePet.start_time, activePet.end_time);
+            const embed = createPetStatusEmbed(interaction.user, pets, activePet, returningInfo);
+            return { success: true, embed };
+        }
+    }
+
+    // Fallback to text message if no interaction provided
+    if (!activePet) {
+        // If no active pet, show all pets with their status
+        let message = "You don't have an active pet. Here are your pets:\n";
+        pets.forEach(pet => {
+            message += `\n- **${pet.pet_type}** (Level ${pet.level}, ${pet.exp} EXP) - ${pet.is_active ? "Active" : "Inactive"}`;
+        });
+        return { success: true, message };
+    }
+
+    // For active pet, show detailed status
+    const returningInfo = calculateDateInfo(activePet.start_time, activePet.end_time);
+
+    let message = `Your **${activePet.pet_type}** (Level ${activePet.level}, ${activePet.exp} EXP) started its journey on *${returningInfo.startDate}* and will return on *${returningInfo.endDate}*.`;
 
     if (returningInfo.hourLeft <= 0) {
         message += "\nIt looks like their journey is complete! You can **recall** them now to get your rewards!";
     } else {
         message += `\nThey will return in approximately ${Math.ceil(returningInfo.hourLeft)} hours. You can recall them early, but the rewards will be reduced.`;
+    }
+
+    // Show other pets as well
+    if (pets.length > 1) {
+        message += "\n\nYour other pets:";
+        pets.forEach(pet => {
+            if (pet.id !== activePet.id) {
+                message += `\n- **${pet.pet_type}** (Level ${pet.level}, ${pet.exp} EXP) - ${pet.is_active ? "Active" : "Inactive"}`;
+            }
+        });
     }
 
     return { success: true, message };
@@ -478,16 +598,26 @@ const recallPet = async (userId) => {
         }
     }
 
+    // Calculate Exp base on item earned and hours passed
+
+    const expEarned = Math.floor(hoursPassed * itemsEarnedCount);
+    let combinedExp = pet.exp + expEarned;
+    let combineLevel = pet.level;
+    if (((pet.level * 100) * baseFactorLevel) >= combinedExp) {
+        // new level
+        combineLevel = combineLevel + 1;
+        combinedExp = 0;
+    }
+
     // Deactivate the pet.
+    const updatingFields = { is_active: false, level: combineLevel, exp: combinedExp }
     const { error: updateError } = await supabase
         .from("user_pets")
-        .update({ is_active: false })
+        .update(updatingFields)
         .eq("id", pet.id);
 
     if (updateError) {
         console.error("Error deactivating pet:", updateError);
-        // Note: The user might have received items but the pet wasn't deactivated.
-        // This might need manual intervention or a more robust transaction system.
         return { success: false, message: "Error finalizing the recall process. Please check your inventory." };
     }
 
@@ -502,31 +632,32 @@ const recallPet = async (userId) => {
 };
 
 /**
- * Feeds all of a user's pets, consuming 1 como per pet.
+ * Feeds 1 of a user's pets, consuming 1 como per pet.
  *
  * @param {string} userId - The Discord user ID.
+ * @param {string} petType - Pet type (refer to PET_TYPES)
  * @returns {Promise<Object>} A promise that resolves to an object with success status and a message.
  */
-const feedPets = async (userId) => {
-    return { success: false, message: "Coming Soon!" };
+const feedPets = async (userId, petType) => {
 
     // Get the user's pets
-    const { data: pets, error: petsError } = await supabase
+    const { data: pet, error: petsError } = await supabase
         .from("user_pets")
         .select("*")
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .eq("pet_type", petType)
+        .single();
 
     if (petsError) {
-        console.error("Error fetching user pets:", petsError);
+        if (petsError.code === "PGRST116") {
+            return { success: false, message: "You don't have any pets to feed." };
+        }
+        console.error("Error recalling pet:", petsError);
         return { success: false, message: "Error fetching your pets. Please try again." };
     }
 
-    if (!pets || pets.length === 0) {
-        return { success: false, message: "You don't have any pets to feed." };
-    }
-
     // Calculate required como (1 como per pet)
-    const requiredComo = pets.length;
+    const requiredComo = 1;
     const { data: userCurrency, error: currencyError } = await supabase
         .from("user_material")
         .select('amount')
@@ -540,7 +671,7 @@ const feedPets = async (userId) => {
     }
 
     if (userCurrency.amount < requiredComo) {
-        return { success: false, message: `You don't have enough Como! You need ${requiredComo} Como to feed your ${pets.length} pet(s).` };
+        return { success: false, message: `You don't have enough Como! You need ${requiredComo} Como to feed your 1 pet(s).` };
     }
 
     // Deduct the required como
@@ -563,25 +694,19 @@ const feedPets = async (userId) => {
         return { success: false, message: "Failed to deduct currency. Please try again." };
     }
 
-    // Update last_feed timestamp for each pet
+    // Update last_feed timestamp for pet
     const currentTime = new Date().toISOString();
-    const updatePromises = pets.map(pet =>
-        supabase
-            .from("user_pets")
-            .update({ last_feed: currentTime })
-            .eq("id", pet.id)
-    );
+    const { error: updateError } = await supabase
+        .from("user_pets")
+        .update({ last_feed: currentTime })
+        .eq("id", pet.id);
 
-    const updateResults = await Promise.all(updatePromises);
-
-    // Check if all updates were successful
-    const failedUpdates = updateResults.filter(result => result.error);
-    if (failedUpdates.length > 0) {
-        console.error("Error updating last_feed for some pets:", failedUpdates);
-        return { success: false, message: "Error updating pet feed status. Please try again." };
+    if (updateError) {
+        console.error("Error feeding pet:", updateError);
+        return { success: false, message: "Error finalizing the feed pet process. Please check your report this to a staff member." };
     }
 
-    return { success: true, message: `You successfully fed your ${pets.length} pet(s) with ${requiredComo} Como!` };
+    return { success: true, message: `You successfully fed your pet with ${requiredComo} Como!` };
 };
 
 /**
@@ -599,31 +724,38 @@ const handlePetCommand = async (interaction) => {
         let result = { success: false, message: 'unknown command.' };
         switch (subcommand) {
             case "buy":
-                const petType = interaction.options.getString("pet_type");
-                result = await buyPet(userId, petType);
+                const petTypeToBuy = interaction.options.getString("pet_type");
+                result = await buyPet(userId, petTypeToBuy);
                 break;
 
             case "send":
-                const petTypeb = interaction.options.getString("pet_type");
-                result = await rentPet(userId, petTypeb);
+                const petTypeToSend = interaction.options.getString("pet_type");
+                result = await sendPet(userId, petTypeToSend);
+                break;
+
+            case "feed":
+                const petTypeToFeed = interaction.options.getString("pet_feed_type");
+                result = await feedPets(userId, petTypeToFeed);
                 break;
 
             case "status":
-                result = await checkPetStatus(userId);
+                result = await checkPetStatus(userId, interaction);
                 break;
 
             case "recall":
                 result = await recallPet(userId);
                 break;
 
-            case "feed":
-                result = await feedPets(userId);
-                break;
-
             default:
                 result = { message: "Unknown command. Please use `/pet buy`, `/pet send`, `/pet status`, `/pet recall`, or `/pet feed`." };
         }
-        await interaction.editReply(result.message);
+
+        // Handle the result based on whether it has an embed or a message
+        if (result.embed) {
+            await interaction.editReply({ embeds: [result.embed] });
+        } else {
+            await interaction.editReply(result.message);
+        }
 
     } catch (error) {
         console.error("Error handling pet command:", error);
@@ -636,7 +768,7 @@ const handlePetCommand = async (interaction) => {
 };
 
 module.exports = {
-    rentPet,
+    sendPet,
     checkPetStatus,
     recallPet,
     handlePetCommand
