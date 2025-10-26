@@ -14,13 +14,13 @@ from typing import Optional, List
 
 def download_twitter_video(url: str, output_path: str) -> str:
     """
-    Downloads video (without audio) from the given X/Twitter URL with max 480p quality.
+    Downloads video (without audio) from the given X/Twitter URL with max 720 quality.
     Returns the filename of the downloaded video.
     """
     ydl_opts = {
         'outtmpl': output_path,
-        # 'format': 'bestvideo[height<=480][ext=mp4]/best[height<=480][ext=mp4]',
-        'format': 'bv*+ba/bestvideo/best',
+        'format': 'bestvideo[height<=720][ext=mp4]/best[height<=720][ext=mp4]',
+        # 'format': 'bv*+ba/bestvideo/best',
         'quiet': False,
         'noprogress': True,
         'postprocessors': [{
@@ -362,8 +362,8 @@ def build_preset(name: str):
     if name == "fast":
         return dict(fps=12, colors=128, dither="bayer:bayer_scale=3", stats_mode_full=False, quality_boost=False, webp_quality=75, webp_lossless=False, max_size=300)
     if name == "medium":
-        return dict(fps=16, colors=200, dither="sierra2_4a", stats_mode_full=True, quality_boost=True, webp_quality=85, webp_lossless=False, max_size=400)
-    return dict(fps=24, colors=256, dither="sierra2_4a", stats_mode_full=True, quality_boost=True, webp_quality=90, webp_lossless=False, max_size=400)
+        return dict(fps=16, colors=200, dither="sierra2_4a", stats_mode_full=True, quality_boost=True, webp_quality=80, webp_lossless=False, max_size=300)
+    return dict(fps=24, colors=256, dither="sierra2_4a", stats_mode_full=True, quality_boost=True, webp_quality=85, webp_lossless=False, max_size=300)
 
 def parse_time(time_str: str) -> int:
     """Parse MM:SS time string into total seconds."""
