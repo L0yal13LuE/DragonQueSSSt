@@ -278,7 +278,7 @@ async function processGifQueue() {
 	} catch (error) {
 		console.error("Error handling GIF request:", error);
 	} finally {
-		await new Promise(resolve => setTimeout(resolve, 2000));
+		await new Promise(resolve => setTimeout(resolve, 1000));
 		// Reset the flag to
 		//  false so the next request can be processed.
 		isProcessingQueue = false;
@@ -343,7 +343,8 @@ client.on("messageCreate", async (message) => {
 		"\n**Example 3 :** last 5 seconds\n`!gif https://x.com/user/status/123456789 00:05 00:10`\n" +
 		"\n**Note**:\n" +
 		"- The orginal video should not be longer than 10-30 seconds (it may cause error if you try to process longer video).\n" +
-		"- Bot can only process up to 10 seconds (if it take longer than 30 seconds will result in timeout).\n" +
+		"- Bot can only process up to 10 seconds long gif (our recomendation setting is 5s long, if image-process take longer than 30 seconds will result in timeout error).\n" +
+		"- Animated gif support up to smooth 60 FPS but quality is medium to low side.\n" +
 		"\n**Rate Limit**:\n" +
 		"- Server cooldown is 10 seconds between commands. (next person must wait 10 second to use the command again).\n" +
 		"- User rate limit is 60 seconds between commands. (you must wait 60 second to use the command again).";
