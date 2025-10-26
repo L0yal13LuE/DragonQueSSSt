@@ -135,25 +135,28 @@ client.once("ready", async () => {
 client.on("messageCreate", async (message) => {
 	if (message.author.bot) return;
 
+	const helpMsg = "Here's how to use the GIF command:\n" +
+		"1. Find a Twitter/X post URL that contains a video (only support x.com domain)\n" +
+		"2. Use the command: `!gif [URL] [start_time] [end_time]`\n" +
+		"   - [URL]: The Twitter/X post URL\n" +
+		"   - [start_time]: Optional start time in MM:SS format (default: 00:00)\n" +
+		"   - [end_time]: Optional end time in MM:SS format (default: entire video)\n" +
+		"\n**Example 1 :** entire video\n`!gif https://x.com/user/status/123456789`\n" +
+		"\n**Example 2 :** first 5 seconds\n`!gif https://x.com/user/status/123456789 00:00 00:05`\n" +
+		"\n**Example 3 :** last 5 seconds\n`!gif https://x.com/user/status/123456789 00:05 00:10`\n" +
+		"\n**Note**:\n" +
+		"- The orginal video should not be longer than 10-30 seconds (it may cause error if you try to process longer video).\n" +
+		"- Bot can only process up to 10 seconds (if it take longer than 30 seconds will result in timeout).\n" +
+		"- While this tool seem to be convineient and easy but the output quality is low-medium due to server limited time.";
+
 	// Check for gif help command
-	if (message.content.toLowerCase() === "gif help") {
-		await message.reply(
-			"Here's how to use the GIF command:\n" +
-			"1. Find a Twitter/X post URL that contains a video (only support x.com domain)\n" +
-			"2. Use the command: `gif [URL] [start_time] [end_time]`\n" +
-			"   - [URL]: The Twitter/X post URL\n" +
-			"   - [start_time]: Optional start time in MM:SS format (default: 00:00)\n" +
-			"   - [end_time]: Optional end time in MM:SS format (default: entire video)\n" +
-			"**Example 1:** entire video\n`gif https://x.com/user/status/123456789 00:00 00:00` or `gif https://x.com/user/status/123456789`\n" +
-			"**Example 2:** first 5 seconds\n`gif https://x.com/user/status/123456789 00:00 00:05`\n" +
-			"**Example 3:** last 5 seconds\n`gif https://x.com/user/status/123456789 00:05 00:10`\n" +
-			"\n**Note**: The original clip should be short clip or maximum 1 minute (it may cause error if you try to process longer video).\nRight now our bot can only process up to 10 seconds of video.\n"
-		);
+	if (message.content.toLowerCase() === "!gif help") {
+		await message.reply(helpMsg);
 		return;
 	}
 
 	// Check for gif command with URL and time parameters
-	const gifCommandMatch = message.content.match(/^gif\s+(https?:\/\/(?:www\.)?x\.com\/[^\s/$.?#]+\/status\/[^\s/$.?#]+\/?)\s*((?:\d{2}:\d{2}\s*){0,2})/i);
+	const gifCommandMatch = message.content.match(/^!gif\s+(https?:\/\/(?:www\.)?x\.com\/[^\s/$.?#]+\/status\/[^\s/$.?#]+\/?)\s*((?:\d{2}:\d{2}\s*){0,2})/i);
 
 	if (gifCommandMatch) {
 		const url = gifCommandMatch[1];
