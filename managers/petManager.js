@@ -154,9 +154,10 @@ const getRandomItem = async (materials) => {
  * Checks if a user has enough "Como" currency to perform an action.
  *
  * @param {string} userId - The Discord user ID.
+ * @param {number} itemCost - total cost of the item
  * @returns {Promise<boolean>} A promise that resolves to true if the user has enough currency, false otherwise.
  */
-const hasEnoughCurrency = async (userId) => {
+const hasEnoughCurrency = async (userId, itemCost) => {
     const { data: userCurrency, error } = await supabase
         .from("user_material")
         .select('amount')
@@ -169,16 +170,17 @@ const hasEnoughCurrency = async (userId) => {
         return false;
     }
 
-    return userCurrency.amount >= PET_COST;
+    return userCurrency.amount >= itemCost;
 };
 
 /**
  * Deducts the pet rental cost from a user's "Como" currency balance.
  *
  * @param {string} userId - The Discord user ID.
+ * @param {number} itemCost - total cost of the item
  * @returns {Promise<boolean>} A promise that resolves to true if the currency was successfully deducted, false otherwise.
  */
-const deductCurrency = async (userId) => {
+const deductCurrency = async (userId, itemCost) => {
     const { data: userMaterial, error } = await supabase
         .from("user_material")
         .select('id, amount')
@@ -191,10 +193,10 @@ const deductCurrency = async (userId) => {
         return false;
     }
 
-    if (userMaterial.amount < PET_COST) {
+    if (userMaterial.amount < itemCost) {
         return false; // Should be caught by hasEnoughCurrency, but as a safeguard.
     }
-    const newAmount = userMaterial.amount - PET_COST;
+    const newAmount = userMaterial.amount - itemCost;
     const userItem = await getUserItem(
         {
             userId: userId.toString(),
@@ -226,7 +228,7 @@ const createPetStatusEmbed = (user, pets, activePet, returningInfo) => {
     // Create base embed
     const embed = createBaseEmbed({
         color: 0x4CAF50, // Green color
-        title: `� ${user.username}'s Pet Status �`,
+        title: `✨ ${user.username}'s Pet Status ✨`,
         description: "Here's the status of your pets:"
     });
 
@@ -234,7 +236,7 @@ const createPetStatusEmbed = (user, pets, activePet, returningInfo) => {
     if (activePet) {
         embed.addFields(
             {
-                name: `� Active Pet: ${activePet.pet_type.toUpperCase()}`,
+                name: `✨ Active Pet: ${activePet.pet_type.toUpperCase()}`,
                 value: `Level: **${activePet.level}**\nEXP: **${activePet.exp}**\n\n` +
                     `Started: *${returningInfo.startDate}*\n` +
                     `Returns: *${returningInfo.endDate}*\n` +
@@ -260,7 +262,7 @@ const createPetStatusEmbed = (user, pets, activePet, returningInfo) => {
 
     // Add other pets information
     if (pets.length > 0) {
-        let otherPetsField = { name: "� Your Other Pets", value: "", inline: false };
+        let otherPetsField = { name: "✨ Your Other Pets", value: "", inline: false };
 
         pets.forEach(pet => {
             if (!activePet || pet.id !== activePet.id) {
@@ -373,6 +375,14 @@ const sendPet = async (userId, petType) => {
 
     if (targetPet) {
 
+        // Check if this pet is hungry or not
+        const lastFeed = new Date(targetPet.last_feed);
+        const now = getCurrentDate();
+        const hoursPassedSunceLastFeed = Math.floor((now - lastFeed) / (1000 * 60 * 60));
+        if (hoursPassedSunceLastFeed > MAX_FARMING_HOURS || targetPet.last_feed === null) {
+            return { success: false, message: "Your pet is hungry. Please feed it using `/pet feed` first." };
+        }
+
         // Set up the pet's journey.
         const startTime = getCurrentDate();
         const endTime = new Date(startTime.getTime() + MAX_FARMING_HOURS * 60 * 60 * 1000);
@@ -390,7 +400,7 @@ const sendPet = async (userId, petType) => {
             console.error("Error sending pet:", error);
             return { success: false, message: "Failed to send the pet. Please try again." };
         }
-        return { success: true, message: `You have successfully sent a ${petType}! It will return in ${MAX_FARMING_HOURS} hours.` };
+        return { success: true, message: `You have successfully sent a ${petType}!\nIt will return in ${MAX_FARMING_HOURS} hours.` };
     } else {
         return { success: false, message: "You don't own this pet." };
     }
@@ -426,12 +436,12 @@ const buyPet = async (userId, petType) => {
     }
 
     // Check for sufficient currency.
-    if (!await hasEnoughCurrency(userId)) {
+    if (!await hasEnoughCurrency(userId, PET_COST)) {
         return { success: false, message: `You don't have enough Como! You need ${PET_COST} Como to rent a pet.` };
     }
 
     // Deduct the currency.
-    if (!await deductCurrency(userId)) {
+    if (!await deductCurrency(userId, PET_COST)) {
         return { success: false, message: "Failed to deduct currency. Please try again." };
     }
 
@@ -570,7 +580,8 @@ const recallPet = async (userId) => {
 
     const startTime = new Date(pet.start_time);
     const now = getCurrentDate();
-    const hoursPassed = Math.floor((now - startTime) / (1000 * 60 * 60));
+    let hoursPassed = Math.floor((now - startTime) / (1000 * 60 * 60));
+    if (hoursPassed > MAX_FARMING_HOURS) hoursPassed = MAX_FARMING_HOURS;
 
     // Pet need at least 1 hour of journey or you can't recall the pet back
     if (hoursPassed < 1) {
@@ -622,7 +633,7 @@ const recallPet = async (userId) => {
     }
 
     const rewardMessage = itemsAdded.length > 0
-        ? `You earned ${itemsAdded.length} items: ${itemsAdded.map(item => `${item.name} ${item.emoji}`).join(", ")}!`
+        ? `You earned ${itemsAdded.length} items.\n${itemsAdded.map(item => `- ${item.name} ${item.emoji} x 1`).join("\n")}!`
         : "Unfortunately, your pet returned with no items this time.";
 
     return {
@@ -658,39 +669,13 @@ const feedPets = async (userId, petType) => {
 
     // Calculate required como (1 como per pet)
     const requiredComo = 1;
-    const { data: userCurrency, error: currencyError } = await supabase
-        .from("user_material")
-        .select('amount')
-        .eq("user_id", userId.toString())
-        .eq("material_id", COMO_MATERIAL_ID)
-        .single();
 
-    if (currencyError) {
-        console.error("Error fetching user currency:", currencyError);
-        return { success: false, message: "Error checking your currency. Please try again." };
+    // Check for sufficient currency.
+    if (!await hasEnoughCurrency(userId, requiredComo)) {
+        return { success: false, message: `You don't have enough Como! You need ${requiredComo} Como to feed a pet.` };
     }
 
-    if (userCurrency.amount < requiredComo) {
-        return { success: false, message: `You don't have enough Como! You need ${requiredComo} Como to feed your 1 pet(s).` };
-    }
-
-    // Deduct the required como
-    const { data: userMaterial, error: materialError } = await supabase
-        .from("user_material")
-        .select('id, amount')
-        .eq("user_id", userId.toString())
-        .eq("material_id", COMO_MATERIAL_ID)
-        .single();
-
-    if (materialError || !userMaterial) {
-        console.error("Error fetching user material for currency deduction:", materialError);
-        return { success: false, message: "Error processing your payment. Please try again." };
-    }
-
-    const newAmount = userMaterial.amount - requiredComo;
-    const updateSuccess = await updateUserItem({ id: userId }, userMaterial, newAmount);
-
-    if (!updateSuccess) {
+    if (!await deductCurrency(userId, requiredComo)) {
         return { success: false, message: "Failed to deduct currency. Please try again." };
     }
 
@@ -706,7 +691,7 @@ const feedPets = async (userId, petType) => {
         return { success: false, message: "Error finalizing the feed pet process. Please check your report this to a staff member." };
     }
 
-    return { success: true, message: `You successfully fed your pet with ${requiredComo} Como!` };
+    return { success: true, message: `Used ${requiredComo} Como to fed ${petType}!` };
 };
 
 /**
@@ -724,17 +709,17 @@ const handlePetCommand = async (interaction) => {
         let result = { success: false, message: 'unknown command.' };
         switch (subcommand) {
             case "buy":
-                const petTypeToBuy = interaction.options.getString("pet_type");
+                const petTypeToBuy = interaction.options.getString("name");
                 result = await buyPet(userId, petTypeToBuy);
                 break;
 
             case "send":
-                const petTypeToSend = interaction.options.getString("pet_type");
+                const petTypeToSend = interaction.options.getString("name");
                 result = await sendPet(userId, petTypeToSend);
                 break;
 
             case "feed":
-                const petTypeToFeed = interaction.options.getString("pet_feed_type");
+                const petTypeToFeed = interaction.options.getString("name");
                 result = await feedPets(userId, petTypeToFeed);
                 break;
 

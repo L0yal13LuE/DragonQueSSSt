@@ -26,7 +26,7 @@ const petCommands = [
         .setDescription("Buy a pet for farming")
         .addStringOption((option) =>
           option
-            .setName("pet_type")
+            .setName("name")
             .setDescription("Type of pet to buy")
             .setRequired(true)
             .addChoices(
@@ -49,7 +49,7 @@ const petCommands = [
         .setDescription("Send your pet to journey farming")
         .addStringOption((option) =>
           option
-            .setName("pet_type")
+            .setName("name")
             .setDescription("select pet (you need to owned it)")
             .setRequired(true)
             .addChoices(
@@ -68,7 +68,7 @@ const petCommands = [
         .setDescription("Feed your pet, they can't survive without food")
         .addStringOption((option) =>
           option
-            .setName("pet_feed_type")
+            .setName("name")
             .setDescription("select pet (you need to owned it)")
             .setRequired(true)
             .addChoices(
@@ -98,7 +98,8 @@ const rest = new REST({ version: "10" }).setToken(token);
 (async () => {
   try {
     await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
-      body: petCommands,
+      body: petCommands, // our commands here
+      // body: [], // empty commands
     });
     console.log("Pet commands registered successfully. 🐾 Your furry friends are ready for adventure!");
   } catch (error) {
