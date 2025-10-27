@@ -128,22 +128,22 @@ const MAX_CONCURRENT_PROCESSES = 1; // Changed to 1 to enforce one-at-a-time pro
 // Track active Python processes for cleanup
 const activePythonProcesses = new Set();
 
-function executePythonCommand(url, startTime, endTime, outputFile) {
+function executePythonCommand(url, startTime, endTime, outputFile, premiumUser) {
 	return new Promise((resolve, reject) => {
 		// Declare pythonProcess with let so it's available in the timeout scope
 		let pythonProcess;
 
-		// Set timeout for the process (30 seconds)
-		const timeout = 30000;
+		// Set timeout for the process (60 seconds)
+		const timeout = 60000;
 		const timer = setTimeout(() => {
 			if (pythonProcess) {
 				pythonProcess.kill('SIGTERM');
-				reject(new Error('Python process timed out after 30 seconds'));
+				reject(new Error('Python process timed out after 60 seconds'));
 			}
 		}, timeout);
 
 		// Use spawn for better process control
-		pythonProcess = spawn('python', ['gif.py', url, startTime, endTime, outputFile]);
+		pythonProcess = spawn('python', ['gif.py', url, startTime, endTime, outputFile, premiumUser ? 'premium' : 'normal']);
 
 		// Track the process for cleanup
 		activePythonProcesses.add(pythonProcess);
@@ -201,11 +201,12 @@ const client = new Client({
 		GatewayIntentBits.Guilds,
 		GatewayIntentBits.GuildMessages,
 		GatewayIntentBits.MessageContent,
+		GatewayIntentBits.GuildMembers
 	],
 	partials: [
 		Partials.Message,
 		Partials.Channel,
-		Partials.Reaction,
+		Partials.Reaction
 	],
 });
 
@@ -219,7 +220,7 @@ function enqueueGifRequest(message, url, startTime, endTime) {
  * Processes the GIF requests in the queue one by one.
  * This function handles the Python process execution and Discord message updates.
  */
-async function processGifQueue() {
+async function processGifQueue(premiumUser) {
 
 	// If we are already processing a request, or the queue is empty, do nothing.
 	if (isProcessingQueue || requestQueue.isEmpty()) {
@@ -245,8 +246,9 @@ async function processGifQueue() {
 		});
 
 		try {
+			console.log(`-------------- [GIF] Processing request for ${message.author.tag} statrted.`);
 			const outputFile = generateOutputFilename();
-			await executePythonCommand(url, startTime, endTime, outputFile);
+			await executePythonCommand(url, startTime, endTime, outputFile, premiumUser);
 
 			// Send the generated image back to the channel using AttachmentBuilder
 			const attachment = new AttachmentBuilder(outputFile);
@@ -259,6 +261,7 @@ async function processGifQueue() {
 			await initialReply.edit({
 				content: `✅ Successfully processed your GIF!\nIf you like my work give me some ❤️!`
 			});
+			console.log(`-------------- [GIF] Processing request for ${message.author.tag} ended.`);
 		} catch (error) {
 			console.error("Error processing GIF command:", error);
 
@@ -276,11 +279,12 @@ async function processGifQueue() {
 			await initialReply.edit({
 				content: errorMessage
 			});
+			console.log(`-------------- [GIF] Processing request for ${message.author.tag} error: ${errorMessage}`);
 		}
 	} catch (error) {
 		console.error("Error handling GIF request:", error);
 	} finally {
-		await new Promise(resolve => setTimeout(resolve, 1000));
+		await new Promise(resolve => setTimeout(resolve, 500));
 		// Reset the flag to
 		//  false so the next request can be processed.
 		isProcessingQueue = false;
@@ -333,6 +337,28 @@ client.once("ready", async () => {
 client.on("messageCreate", async (message) => {
 	if (message.author.bot) return;
 
+	// Boost Logging for premium features
+	let premiumUser = false;
+
+	// Get the guild's booster role
+	const boosterRole = message.guild.roles.premiumSubscriberRole;
+	// Get the member's GuildMember object
+	const member = message.member;
+	if (boosterRole) {
+		console.log(`The server's booster role is: ${boosterRole.name}`);
+	} else {
+		console.log('This server does not have a booster role (likely has no boosts).');
+	}
+
+	// Check if they are boosting
+	if (member.premiumSince) {
+		const boostDate = new Date(member.premiumSince).toLocaleDateString();
+		console.log(`User: ${message.author.username} : Thank you for boosting this server since ${boostDate}!`);
+		premiumUser = true;
+	} else {
+		console.log(`User: ${message.author.username} : You are not currently boosting this server.`);
+	}
+
 	// Check for gif help command
 	const helpMsg = "Here's how to use the GIF command:\n" +
 		"1. Find a Twitter/X post URL that contains a video (only support x.com domain)\n" +
@@ -345,11 +371,10 @@ client.on("messageCreate", async (message) => {
 		"\n**Example 3 :** last 5 seconds\n`!gif https://x.com/user/status/123456789 00:05 00:10`\n" +
 		"\n**Note**:\n" +
 		"- The orginal video should not be longer than 10-30 seconds (it may cause error if you try to process longer video).\n" +
-		"- Bot can only process up to 10 seconds long gif (our recomendation setting is 5s long, if image-process take longer than 30 seconds will result in timeout error).\n" +
-		"- Animated gif support up to smooth 60 FPS but quality is medium to low side.\n" +
-		"\n**Rate Limit**:\n" +
-		"- Server cooldown is 10 seconds between commands. (next person must wait 10 second to use the command again).\n" +
-		"- User rate limit is 60 seconds between commands. (you must wait 60 second to use the command again).";
+		"- Bot can only process up to **5** seconds long gif (if whole process take longer than 60 seconds will result in timeout error).\n" +
+		"\n**⚠️ Caution/Limit ⚠️**\n" +
+		"- Server cooldown is 10 seconds between commands.\n" +
+		"- User rate limit is 60 seconds between commands.";
 
 	if (message.content.toLowerCase() === "!gif help") {
 		await message.reply(helpMsg);
@@ -416,7 +441,7 @@ client.on("messageCreate", async (message) => {
 			return;
 		} else {
 			// Start processing the queue if not already processing
-			processGifQueue();
+			processGifQueue(premiumUser);
 		}
 	}
 });

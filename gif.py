@@ -14,12 +14,12 @@ from typing import Optional, List
 
 def download_twitter_video(url: str, output_path: str) -> str:
     """
-    Downloads video (without audio) from the given X/Twitter URL with max 720 quality.
+    Downloads video (without audio) from the given X/Twitter URL with max 1080 quality.
     Returns the filename of the downloaded video.
     """
     ydl_opts = {
         'outtmpl': output_path,
-        'format': 'bestvideo[height<=720][ext=mp4]/best[height<=720][ext=mp4]',
+        'format': 'bestvideo[height<=1080][ext=mp4]/best[height<=1080][ext=mp4]',
         # 'format': 'bv*+ba/bestvideo/best',
         'quiet': False,
         'noprogress': True,
@@ -362,8 +362,8 @@ def build_preset(name: str):
     if name == "fast":
         return dict(fps=12, colors=128, dither="bayer:bayer_scale=3", stats_mode_full=False, quality_boost=False, webp_quality=75, webp_lossless=False, max_size=300)
     if name == "medium":
-        return dict(fps=16, colors=200, dither="sierra2_4a", stats_mode_full=True, quality_boost=True, webp_quality=80, webp_lossless=False, max_size=300)
-    return dict(fps=24, colors=256, dither="sierra2_4a", stats_mode_full=True, quality_boost=True, webp_quality=85, webp_lossless=False, max_size=300)
+        return dict(fps=16, colors=200, dither="sierra2_4a", stats_mode_full=True, quality_boost=False, webp_quality=80, webp_lossless=False, max_size=300)
+    return dict(fps=24, colors=256, dither="sierra2_4a", stats_mode_full=True, quality_boost=True, webp_quality=90, webp_lossless=False, max_size=720)
 
 def parse_time(time_str: str) -> int:
     """Parse MM:SS time string into total seconds."""
@@ -390,7 +390,7 @@ def main():
 
     # Set default quality to high
     preset = build_preset("high")
-    preset['fps'] = 60  # Override with default 30fps
+    preset['fps'] = 24  # Override with default 30fps
 
     print(f"Processing: {args.url}")
     print(f"Time range: {args.start_time} to {args.end_time}")
@@ -438,9 +438,9 @@ def main():
         if args.start_time == "00:00" and args.end_time == "00:00":
             video_duration = _get_video_duration(input_video)
             print(f"Video duration: {video_duration} seconds")
-            if video_duration > 10:
-                print("Video is longer than 10 seconds, limiting to 10 seconds")
-                end_time = "00:10"
+            if video_duration > 5:
+                print("Video is longer than 5 seconds, limiting to 5 seconds")
+                end_time = "00:05"
         elif args.start_time != "00:00" and args.end_time != "00:00":
             start_time = args.start_time
             end_time = args.end_time
