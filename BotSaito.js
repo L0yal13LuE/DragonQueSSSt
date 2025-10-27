@@ -52,6 +52,7 @@ const {
 	Client,
 	GatewayIntentBits,
 	Partials,
+	AttachmentBuilder
 } = require("discord.js");
 const { spawn } = require('child_process');
 
@@ -247,10 +248,11 @@ async function processGifQueue() {
 			const outputFile = generateOutputFilename();
 			await executePythonCommand(url, startTime, endTime, outputFile);
 
-			// Send the generated image back to the channel
+			// Send the generated image back to the channel using AttachmentBuilder
+			const attachment = new AttachmentBuilder(outputFile);
 			await message.channel.send({
 				content: `Here's your processed gif.`,
-				files: [outputFile]
+				files: [attachment]
 			});
 
 			// Edit the initial reply to indicate success
