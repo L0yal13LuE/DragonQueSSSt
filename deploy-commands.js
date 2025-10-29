@@ -72,6 +72,76 @@ const commands = [
         .setDescription("Choose the player to challenge")
         .setRequired(true)
     ),
+  new SlashCommandBuilder()
+    .setName("pet")
+    .setDescription("Pet farming commands")
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("buy")
+        .setDescription("Buy a pet for farming")
+        .addStringOption((option) =>
+          option
+            .setName("name")
+            .setDescription("Type of pet to buy")
+            .setRequired(true)
+            .addChoices(
+              { name: "Cat", value: "cat" },
+              { name: "Chicken", value: "chicken" },
+              { name: "Bird", value: "bird" },
+              { name: "Hamster", value: "hamster" },
+              { name: "Panda", value: "panda" },
+              { name: "Fox", value: "fox" },
+            )
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("send")
+        .setDescription("Send your pet to journey farming")
+        .addStringOption((option) =>
+          option
+            .setName("name")
+            .setDescription("select pet (you need to owned it)")
+            .setRequired(true)
+            .addChoices(
+              { name: "Cat", value: "cat" },
+              { name: "Chicken", value: "chicken" },
+              { name: "Bird", value: "bird" },
+              { name: "Hamster", value: "hamster" },
+              { name: "Panda", value: "panda" },
+              { name: "Fox", value: "fox" },
+            )
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("feed")
+        .setDescription("Feed your pet, they can't survive without food")
+        .addStringOption((option) =>
+          option
+            .setName("name")
+            .setDescription("select pet (you need to owned it)")
+            .setRequired(true)
+            .addChoices(
+              { name: "Cat", value: "cat" },
+              { name: "Chicken", value: "chicken" },
+              { name: "Bird", value: "bird" },
+              { name: "Hamster", value: "hamster" },
+              { name: "Panda", value: "panda" },
+              { name: "Fox", value: "fox" },
+            )
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("status")
+        .setDescription("Check your pet's status")
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("recall")
+        .setDescription("Recall your pet and collect rewards")
+    ),
 ].map((cmd) => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(token);
