@@ -319,7 +319,7 @@ def convert_video_to_webp(
         "-sws_flags", "lanczos+accurate_rnd+full_chroma_int",
         "-loop", "0",
         "-c:v", "libwebp",
-        "-compression_level", "9",
+        "-compression_level", "6",
         "-q:v", str(min(80, max(50, webp_quality))),
         "-preset", "default",
         "-f", "webp",
@@ -363,7 +363,7 @@ def build_preset(name: str):
         return dict(fps=12, colors=128, dither="bayer:bayer_scale=3", stats_mode_full=False, quality_boost=False, webp_quality=75, webp_lossless=False, max_size=300)
     if name == "medium":
         return dict(fps=16, colors=200, dither="sierra2_4a", stats_mode_full=True, quality_boost=False, webp_quality=80, webp_lossless=False, max_size=300)
-    return dict(fps=24, colors=256, dither="sierra2_4a", stats_mode_full=True, quality_boost=True, webp_quality=90, webp_lossless=False, max_size=720)
+    return dict(fps=24, colors=256, dither="sierra2_4a", stats_mode_full=True, quality_boost=False, webp_quality=90, webp_lossless=False, max_size=720)
 
 def parse_time(time_str: str) -> int:
     """Parse MM:SS time string into total seconds."""

@@ -7,6 +7,8 @@ require("dotenv").config({
 	}[process.env.NODE_ENV || "development"],
 });
 
+const PYTHON_CMD = process.env.CMD_PYTHON ? process.env.CMD_PYTHON : "python";
+
 // Custom Rate Limiting System
 const lastServerCommandTime = new Map(); // Tracks last command time per server
 const lastUserCommand = new Map();      // Tracks last command content per user
@@ -143,7 +145,7 @@ function executePythonCommand(url, startTime, endTime, outputFile, premiumUser) 
 		}, timeout);
 
 		// Use spawn for better process control
-		pythonProcess = spawn('python', ['gif.py', url, startTime, endTime, outputFile, premiumUser ? 'premium' : 'normal']);
+		pythonProcess = spawn(PYTHON_CMD, ['gif.py', url, startTime, endTime, outputFile]);
 
 		// Track the process for cleanup
 		activePythonProcesses.add(pythonProcess);
