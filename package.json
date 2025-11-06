@@ -8,8 +8,8 @@
     "start:blue": "cross-env NODE_ENV=blue node BotShiro.js",
     "start:staging": "cross-env NODE_ENV=staging node BotShiro.js",
     "start:prod": "cross-env NODE_ENV=production node BotShiro.js",
-    "saito": "node BotSaito.js",
-    "saito:prod": "cross-env NODE_ENV=production node BotSaito.js"
+    "saito": "node BotSaito.cjs",
+    "saito:prod": "cross-env NODE_ENV=production node BotSaito.cjs"
   },
   "keywords": [],
   "author": "",

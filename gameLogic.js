@@ -364,7 +364,7 @@ const hourlyMonsterCheck = async (client, currentMonsterStateRef) => {
       const newMonster = await spawnNewMonster(today);
       if (newMonster) {
         currentMonsterStateRef.current = newMonster; // Update shared state
-        announceMonsterSpawn(currentMonsterStateRef.current);
+        // announceMonsterSpawn(currentMonsterStateRef.current);
       } else {
         console.error("Hourly Check: Failed to spawn new monster.");
         currentMonsterStateRef.current = null; // Update shared state
