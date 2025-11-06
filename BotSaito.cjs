@@ -1,3 +1,5 @@
+const fs = require("fs");
+
 require("dotenv").config({
 	path: {
 		blue: ".env.blue",
@@ -7,21 +9,49 @@ require("dotenv").config({
 	}[process.env.NODE_ENV || "development"],
 });
 
-const PYTHON_CMD = process.env.CMD_PYTHON ? process.env.CMD_PYTHON : "python";
+const {
+	Client,
+	GatewayIntentBits,
+	Partials,
+	AttachmentBuilder
+} = require("discord.js");
 
-// Custom Rate Limiting System
+const { spawn } = require('child_process');
+
+// --- Configuration ---
+const TOKEN = process.env.DISCORD_TOKEN;
+const PYTHON_CMD = process.env.CMD_PYTHON ? process.env.CMD_PYTHON : "python";
+let PYTHON_API_ONLINE = true;
+let PYTHON_API_TM = null;
+
+// --- Configuration Validation ---
+if (!TOKEN) {
+	console.error("FATAL ERROR: DISCORD_TOKEN not found in .env file!");
+	process.exit(1);
+}
+
+// --- Initialize Discord Client ---
+const client = new Client({
+	intents: [
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.MessageContent,
+		GatewayIntentBits.GuildMembers
+	],
+	partials: [
+		Partials.Message,
+		Partials.Channel,
+		Partials.Reaction
+	],
+});
+
+// --- Custom Rate Limiting System
 const lastServerCommandTime = new Map(); // Tracks last command time per server
 const lastUserCommand = new Map();      // Tracks last command content per user
-const SERVER_COOLDOWN = 10000;          // 10 seconds between server commands
+const SERVER_COOLDOWN = 60000;          // 60 seconds between server commands
 const SAME_COMMAND_PENALTY = 60000;      // Additional 60 seconds for repeated commands
 
-/**
- * Custom server rate limiting function
- * @param {string} serverId - The server ID
- * @param {string} userId - The user ID
- * @param {string} command - The command being executed
- * @returns {number} Time remaining until next allowed command (0 if allowed)
- */
+// --- Custom server rate limiting function
 function checkCustomRateLimit(serverId, userId, command) {
 	const now = Date.now();
 
@@ -49,14 +79,6 @@ function checkCustomRateLimit(serverId, userId, command) {
 
 	return totalWaitTime;
 }
-
-const {
-	Client,
-	GatewayIntentBits,
-	Partials,
-	AttachmentBuilder
-} = require("discord.js");
-const { spawn } = require('child_process');
 
 // --- Custom Queue Implementation (Linked List based) ---
 class Node {
@@ -124,13 +146,10 @@ class Queue {
 const requestQueue = new Queue();
 let isProcessingQueue = false;
 
-// Maximum number of concurrent Python processes allowed
-const MAX_CONCURRENT_PROCESSES = 1; // Changed to 1 to enforce one-at-a-time processing
-
 // Track active Python processes for cleanup
 const activePythonProcesses = new Set();
 
-function executePythonCommand(url, startTime, endTime, outputFile, premiumUser) {
+function useLocalPython(url, startTime, endTime, outputFile) {
 	return new Promise((resolve, reject) => {
 		// Declare pythonProcess with let so it's available in the timeout scope
 		let pythonProcess;
@@ -185,32 +204,66 @@ function executePythonCommand(url, startTime, endTime, outputFile, premiumUser) 
 			reject(error);
 		});
 	});
-
 }
 
-// --- Configuration ---
-const TOKEN = process.env.DISCORD_TOKEN;
+async function resumeOnlineAPI() {
 
-// --- Configuration Validation ---
-if (!TOKEN) {
-	console.error("FATAL ERROR: DISCORD_TOKEN not found in .env file!");
-	process.exit(1);
+	const RENDER_API_KEY = process.env.RENDER_API_KEY;
+	if (!RENDER_API_KEY) throw new Error("RENDER_API_KEY not set");
+
+	const RENDER_SERVICE_ID = process.env.RENDER_SERVICE_ID;
+	if (!RENDER_SERVICE_ID) throw new Error("RENDER_SERVICE_ID not set");
+
+	try {
+		const res = await fetch(`https://api.render.com/v1/services/${RENDER_SERVICE_ID}/resume`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json", "Authorization": `Bearer ${RENDER_API_KEY}` }
+		});
+		console.log('[Saito] : resumeOnlineAPI > done', res.text())
+		if (res.ok) return true;
+		return false;
+	} catch (error) {
+		console.log('[Saito] : resumeOnlineAPI > error', error)
+		return false;
+	}
 }
 
-// --- Initialize Discord Client ---
-const client = new Client({
-	intents: [
-		GatewayIntentBits.Guilds,
-		GatewayIntentBits.GuildMessages,
-		GatewayIntentBits.MessageContent,
-		GatewayIntentBits.GuildMembers
-	],
-	partials: [
-		Partials.Message,
-		Partials.Channel,
-		Partials.Reaction
-	],
-});
+let callingAPI = true;
+async function useOnlineAPI(url, startTime, endTime, outputFile) {
+	const apiUrl = process.env.PYTHON_API_URL;
+	if (!apiUrl) throw new Error("PYTHON_API_URL not set");
+
+	callingAPI = true;
+
+	const timeout = 120000;
+	const timerCalling = setTimeout(() => {
+		if (callingAPI) {
+			clearTimeout(timerCalling);
+			throw new Error('Python process timed out after 120 seconds,');
+		}
+	}, timeout);
+
+	const res = await fetch(`${apiUrl}/convert`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ url, start_time: startTime, end_time: endTime }),
+	});
+
+	callingAPI = false;
+
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(`Python API failed: ${text}`);
+	}
+
+	// Stream WebP response into a local file
+	const buffer = Buffer.from(await res.arrayBuffer());
+	await fs.promises.writeFile(outputFile, buffer);
+
+	return outputFile;
+}
+
+
 
 // Function to add a GIF request to the processing queue
 function enqueueGifRequest(message, url, startTime, endTime) {
@@ -218,16 +271,14 @@ function enqueueGifRequest(message, url, startTime, endTime) {
 	return requestQueue.size;
 }
 
-/**
- * Processes the GIF requests in the queue one by one.
- * This function handles the Python process execution and Discord message updates.
- */
-async function processGifQueue(premiumUser) {
+async function processGifQueue() {
 
 	// If we are already processing a request, or the queue is empty, do nothing.
 	if (isProcessingQueue || requestQueue.isEmpty()) {
 		return;
 	}
+
+
 
 	// Set the flag to true to signal that we've started processing.
 	isProcessingQueue = true;
@@ -244,32 +295,27 @@ async function processGifQueue(premiumUser) {
 
 		// Send initial reply to acknowledge the command
 		const initialReply = await message.reply({
-			content: `Processing your x.com post: \n${url}\nStart: ${startTime}\nEnd: ${endTime}\nBe patient while I process your request...`
+			content: `Please wait... 😜`
 		});
 
 		try {
 			console.log(`-------------- [GIF] Processing request for ${message.author.tag} statrted.`);
 			const outputFile = generateOutputFilename();
-			await executePythonCommand(url, startTime, endTime, outputFile, premiumUser);
-
-			// Send the generated image back to the channel using AttachmentBuilder
-			const attachment = new AttachmentBuilder(outputFile);
+			// const imageOutputFile = PYTHON_API_ONLINE ? await useOnlineAPI(url, startTime, endTime, outputFile) : await useLocalPython(url, startTime, endTime, outputFile);
+			const imageOutputFile = await useOnlineAPI(url, startTime, endTime, outputFile);
+			const attachment = new AttachmentBuilder(imageOutputFile);
 			await message.channel.send({
-				content: `Here's your processed gif.`,
+				content: `😉 Here's your processed gif.`,
 				files: [attachment]
 			});
-
-			// Edit the initial reply to indicate success
 			await initialReply.edit({
-				content: `✅ Successfully processed your GIF!\nIf you like my work give me some ❤️!`
+				content: `✅ Successfully processed your GIF! If you like my work give me some ❤️`
 			});
 			console.log(`-------------- [GIF] Processing request for ${message.author.tag} ended.`);
 		} catch (error) {
 			console.error("Error processing GIF command:", error);
 
-			// Provide more detailed error messages to the user
 			let errorMessage = "Sorry, I encountered an error while processing your request.";
-
 			if (error.message.includes('timed out')) {
 				errorMessage = "⏱️ The processing took too long and timed out. Please try again with a shorter video segment.";
 			} else if (error.message.includes('Python process failed')) {
@@ -287,43 +333,15 @@ async function processGifQueue(premiumUser) {
 		console.error("Error handling GIF request:", error);
 	} finally {
 		await new Promise(resolve => setTimeout(resolve, 500));
-		// Reset the flag to
-		//  false so the next request can be processed.
 		isProcessingQueue = false;
-		// Call processQueue again to check if there are more items waiting.
 		process.nextTick(processGifQueue);
 	}
 }
 
-/**
- * Checks if the GIF queue is currently processing a request.
- * @returns {boolean} True if a request is being processed, false otherwise.
- */
 function getIsGifProcessing() {
 	return isProcessingQueue;
 }
 
-/**
- * Gets the current size of the GIF request queue.
- * @returns {number} The number of requests currently in the queue.
- */
-function getGifQueueSize() {
-	return requestQueue.size;
-}
-
-// Function to execute command from gif.cjs (now only used internally by the queue system)
-async function executeGifCommand(url, startTime = "00:00", endTime = "00:00") {
-	const outputFile = generateOutputFilename();
-	try {
-		await executePythonCommand(url, startTime, endTime, outputFile);
-		return outputFile;
-	} catch (error) {
-		console.error("Error executing GIF command:", error);
-		throw error;
-	}
-}
-
-// Function to generate a unique output filename
 function generateOutputFilename() {
 	const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 	const randomSuffix = Math.floor(Math.random() * 1000000);
@@ -333,6 +351,41 @@ function generateOutputFilename() {
 // --- Bot Ready Event ---
 client.once("ready", async () => {
 	console.log(`[Saito] Logged in as ${client.user.tag}!`);
+
+	// const responseOnInit = await fetch('https://twitter-webp-api.onrender.com/');
+	// if (responseOnInit.ok) {
+	// 	console.log('[Saito] Python API init ping successful');
+	// 	PYTHON_API_ONLINE = true;
+	// } else {
+	// 	PYTHON_API_ONLINE = false;
+	// }
+
+	// setInterval(async () => {
+	// 	const controller = new AbortController();
+	// 	const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout
+
+	// 	try {
+	// 		const response = await fetch('https://twitter-webp-api.onrender.com/', { signal: controller.signal });
+	// 		clearTimeout(timeoutId);
+	// 		if (response.ok) {
+	// 			console.log('[Saito] Python API ping successful');
+	// 			PYTHON_API_ONLINE = true;
+	// 		} else {
+	// 			console.log(`[Saito] Python API ping failed with status: ${response.status}`);
+	// 			PYTHON_API_ONLINE = false;
+	// 		}
+	// 	} catch (error) {
+	// 		clearTimeout(timeoutId);
+	// 		if (error.name === 'AbortError') {
+	// 			console.error('[Saito] Python API ping timed out after 30 seconds');
+	// 		} else {
+	// 			console.error('[Saito] Python API ping error:', error.message);
+	// 		}
+	// 		PYTHON_API_ONLINE = false;
+	// 		// await resumeOnlineAPI();
+	// 	}
+	// }, 600000);
+
 });
 
 // --- Message Create Event ---
@@ -346,20 +399,6 @@ client.on("messageCreate", async (message) => {
 	const boosterRole = message.guild.roles.premiumSubscriberRole;
 	// Get the member's GuildMember object
 	const member = message.member;
-	if (boosterRole) {
-		console.log(`The server's booster role is: ${boosterRole.name}`);
-	} else {
-		console.log('This server does not have a booster role (likely has no boosts).');
-	}
-
-	// Check if they are boosting
-	if (member.premiumSince) {
-		const boostDate = new Date(member.premiumSince).toLocaleDateString();
-		console.log(`User: ${message.author.username} : Thank you for boosting this server since ${boostDate}!`);
-		premiumUser = true;
-	} else {
-		console.log(`User: ${message.author.username} : You are not currently boosting this server.`);
-	}
 
 	// Check for gif help command
 	const helpMsg = "Here's how to use the GIF command:\n" +
@@ -373,9 +412,9 @@ client.on("messageCreate", async (message) => {
 		"\n**Example 3 :** last 5 seconds\n`!gif https://x.com/user/status/123456789 00:05 00:10`\n" +
 		"\n**Note**:\n" +
 		"- The orginal video should not be longer than 10-30 seconds (it may cause error if you try to process longer video).\n" +
-		"- Bot can only process up to **5** seconds long gif (if whole process take longer than 60 seconds will result in timeout error).\n" +
+		"- Bot can only process up to **5** seconds long gif (if whole process take longer than 120 seconds will result in timeout error).\n" +
 		"\n**⚠️ Caution/Limit ⚠️**\n" +
-		"- Server cooldown is 10 seconds between commands.\n" +
+		"- Server cooldown is 60 seconds between commands.\n" +
 		"- User rate limit is 60 seconds between commands.";
 
 	if (message.content.toLowerCase() === "!gif help") {
@@ -387,6 +426,23 @@ client.on("messageCreate", async (message) => {
 	const gifCommandMatch = message.content.match(/^!gif\s+(https?:\/\/(?:www\.)?x\.com\/[^\s/$.?#]+\/status\/[^\s/$.?#]+\/?)\s*((?:\d{2}:\d{2}\s*){0,2})/i);
 
 	if (gifCommandMatch) {
+
+		if (boosterRole) {
+			console.log(`The server's booster role is: ${boosterRole.name}`);
+		} else {
+			console.log('This server does not have a booster role (likely has no boosts).');
+		}
+
+		// Check if they are boosting
+		if (member.premiumSince) {
+			const boostDate = new Date(member.premiumSince).toLocaleDateString();
+			console.log(`User: ${message.author.username} : Thank you for boosting this server since ${boostDate}!`);
+			premiumUser = true;
+		} else {
+			console.log(`User: ${message.author.username} : You are not currently boosting this server.`);
+		}
+
+
 		const url = gifCommandMatch[1];
 		const command = message.content; // The full command string
 
