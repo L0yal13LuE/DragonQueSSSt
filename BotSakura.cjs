@@ -290,6 +290,28 @@ function generateOutputFilename() {
     return path.join(CONFIG.OUTPUT_DIR, `${timestamp}-${randomSuffix}.webp`);
 }
 
+function parseTime(input) {
+    if (!input) return null;
+
+    input = input.toLowerCase().trim();
+
+    // Handle colon format (mm:ss)
+    if (/^\d{1,2}:\d{1,2}$/.test(input)) {
+        const [m, s] = input.split(":").map(Number);
+        return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+
+    // Handle pure number or decimal with optional "s" → interpret as seconds
+    if (/^\d+(\.\d+)?s?$/.test(input)) {
+        const seconds = Math.round(parseFloat(input));
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    }
+
+    return "00:00"; // invalid return default
+}
+
 // --- Bot Events ---
 
 client.once("clientReady", () => {
@@ -320,50 +342,13 @@ client.on("messageCreate", async (message) => {
             return;
         }
 
-        const enhancedRegex = /^!gif\s+(https?:\/\/(?:www\.)?x\.com\/[^\s/$.?#]+\/status\/[^\s/$.?#]+)(\/?)(?:\?[^\s]*)?\s*((?:\d{2}:\d{2}\s*){0,2})/i;
+        const enhancedRegex = /^!gif\s+(https?:\/\/\S+)(?:\s+([\d:.smh]+))?(?:\s+([\d:.smh]+))?$/i;
         const match = message.content.match(enhancedRegex);
 
-        let url = null;
-        let timeStart = "00:00";
-        let timeEnd = "00:00";
-
         if (match) {
-            // Group 1 is the base path, Group 2 is the optional trailing slash
-            url = match[1] + match[2];
-
-            // Group 3 contains the time codes string
-            const timeString = match[3].trim();
-            const times = timeString.split(/\s+/).filter(t => t.length > 0);
-
-            if (times.length >= 1) {
-                timeStart = times[0];
-            }
-            if (times.length >= 2) {
-                timeEnd = times[1];
-            }
-
-            // const url = gifCommandMatch[1];
-            // const command = message.content;
-            // waitTime = checkCustomRateLimit(message.guild.id, message.author.id, command);
-
-            // --- Disable rate limit for now, better ux experience since we have queue background process anyway.
-            // if (waitTime > 0) {
-            // 	const secondsRemaining = Math.ceil(waitTime / 1000);
-            // 	const isRepeatedCommand = lastUserCommand.get(message.author.id)?.command === command;
-            // 	const replyMessage = isRepeatedCommand
-            // 		? `⚠️ รอสัก ${secondsRemaining} วินาทีแล้วค่อยพิมพ์คำสั่งใหม่น้า`
-            // 		: `⏳ รอแป๊บนะสัก ${secondsRemaining} วินาทีขอให้เราได้พักบ้างอะไรบ้าง`;
-            // 	await message.reply({ content: replyMessage });
-            // 	return;
-            // }
-
-            // let startTime = "00:00", endTime = "00:00";
-            // const timeParams = gifCommandMatch[2]?.trim();
-            // if (timeParams) {
-            //     const times = timeParams.split(/\s+/).filter(Boolean);
-            //     if (times.length >= 1) startTime = times[0];
-            //     if (times.length >= 2) endTime = times[1];
-            // }
+            const url = match[1].trim(); 
+            const timeStart = parseTime(match[2]) || '00:00';
+            const timeEnd = parseTime(match[3]) || '00:00';
 
             //  Enqueue the request and immediately reply to the user.
             const queuePosition = enqueueGifRequest(message, url, timeStart, timeEnd);
@@ -374,7 +359,6 @@ client.on("messageCreate", async (message) => {
             } else {
                 // responseMessage += "\nI'm starting on it right away! 🚀";
             }
-
             await message.reply({ content: responseMessage });
         }
     } catch (error) {
