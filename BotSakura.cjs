@@ -152,7 +152,7 @@ async function useOnlineAPI(url, startTime, endTime, outputFile) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CONFIG.API_TIMEOUT);
     try {
-        console.log(`[GIF] API : url=${url}} | start_time=${startTime} | end_time=${endTime}`)
+        console.log(`[GIF] API : url=${url} | start_time=${startTime} | end_time=${endTime}`)
         const res = await fetch(`${CONFIG.PYTHON_API_URL}/convert`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -292,7 +292,7 @@ function generateOutputFilename() {
 
 // --- Bot Events ---
 
-client.once("ready", () => {
+client.once("clientReady", () => {
     console.log(`[INFO] Logged in as ${client.user.tag}! Bot is ready.`);
     // setInterval(cleanupRateLimitMaps, CONFIG.RATE_LIMIT_CLEANUP_INTERVAL);
     // NEW: Kick off the queue processor once the bot is ready.
