@@ -9,7 +9,9 @@
     "start:staging": "cross-env NODE_ENV=staging node BotShiro.js",
     "start:prod": "cross-env NODE_ENV=production node BotShiro.js",
     "saito": "node BotSaito.cjs",
-    "saito:prod": "cross-env NODE_ENV=production node BotSaito.cjs"
+    "saito:prod": "cross-env NODE_ENV=production node BotSaito.cjs",
+    "sakura": "node BotSakura.cjs",
+    "sakura:prod": "cross-env NODE_ENV=production node BotSakura.cjs"
   },
   "keywords": [],
   "author": "",
