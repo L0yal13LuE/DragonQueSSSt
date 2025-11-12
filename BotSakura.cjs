@@ -144,6 +144,8 @@ const requestQueue = new Queue();
 let isProcessingQueue = false;
 // NEW: Track the currently processing item to inform users.
 let currentlyProcessing = null;
+// NEW: Analytics
+const processingTimes = []; // To store completion times in ms
 
 async function useOnlineAPI(url, startTime, endTime, outputFile) {
     if (!CONFIG.PYTHON_API_URL) {
@@ -210,6 +212,7 @@ async function processGifQueue() {
 
     isProcessingQueue = true;
     const job = requestQueue.dequeue();
+    const processingStartTime = Date.now();
     currentlyProcessing = job; // NEW: Set the current job for status messages
     const { author, channelId, url, startTime, endTime } = job;
 
@@ -267,6 +270,17 @@ async function processGifQueue() {
                     console.error(`[ERROR] Failed to delete temporary file ${outputFile}:`, cleanupError);
                 }
             }
+        }
+
+        // NEW: Analytics Calculation
+        const processingTime = Date.now() - processingStartTime;
+        processingTimes.push(processingTime);
+
+        // Calculate and log average processing time
+        if (processingTimes.length > 0) {
+            const totalProcessingTime = processingTimes.reduce((acc, time) => acc + time, 0);
+            const averageProcessingTime = totalProcessingTime / processingTimes.length;
+            console.log(`[ANALYTICS] Job for ${author.tag} finished in ${(processingTime / 1000).toFixed(2)}s. Average processing time: ${(averageProcessingTime / 1000).toFixed(2)}s over ${processingTimes.length} jobs.`);
         }
 
         // NEW: Cooldown buffer logic.
