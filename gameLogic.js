@@ -71,9 +71,10 @@ const spawnNewMonster = async (dateString) => {
     return null; // Indicate that no monster could be spawned
   }
 
-  const chosenMonster =
-    allMonsters[Math.floor(Math.random() * allMonsters.length)];
-  const monsterHp = chosenMonster.base_hp * (constants.LEVELING_FACTOR / 5);
+  const chosenMonster = allMonsters[Math.floor(Math.random() * allMonsters.length)];
+
+  // 2025.11.15 reduce high hp factor to match current low player based.
+  const monsterHp = chosenMonster.base_hp;// * (constants.LEVELING_FACTOR / 5);
 
   return await createMonster(
     dateString,
