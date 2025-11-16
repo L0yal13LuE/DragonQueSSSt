@@ -12,7 +12,7 @@ import urllib.request
 import argparse
 from typing import Optional, List
 
-def download_twitter_video_og(url: str, output_path: str) -> str:
+def download_twitter_video(url: str, output_path: str) -> str:
     """
     Downloads video (without audio) from the given X/Twitter URL with max 1080 quality.
     Returns the filename of the downloaded video.
@@ -23,59 +23,15 @@ def download_twitter_video_og(url: str, output_path: str) -> str:
         # 'format': 'bv*+ba/bestvideo/best',
         'quiet': False,
         'noprogress': True,
-        # 'postprocessors': [{
-        #     'key': 'FFmpegVideoConvertor',
-        #     'preferedformat': 'mp4',
-        # }],
+        'postprocessors': [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }],
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         final_name = ydl.prepare_filename(info)
         return final_name
-
-def download_twitter_video(url, output_template, video_index=None):
-    """
-    Download one or all videos from a Twitter post using yt_dlp.
-    If video_index is specified (1-based), only that specific clip is downloaded.
-    Returns:
-        - str: path to the downloaded file if video_index is set
-        - list[str]: all downloaded file paths otherwise
-    """
-    ydl_opts = {
-        'quiet': True,
-        'noprogress': True,
-        'outtmpl': output_template,
-        'merge_output_format': 'mp4',
-        'format': 'bestvideo[height<=1080][ext=mp4]/best[height<=1080][ext=mp4]',
-    }
-
-    downloaded_paths = []
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-
-        # Handle playlists / multi-video posts
-        if 'entries' in info:
-            entries = info['entries']
-
-            if video_index and 1 <= video_index <= len(entries):
-                entry = entries[video_index - 1]
-                result = ydl.process_ie_result(entry, download=True)
-                file_path = ydl.prepare_filename(result)
-                return file_path  # ✅ return path as string
-
-            # No index provided: download all videos
-            for entry in entries:
-                result = ydl.process_ie_result(entry, download=True)
-                file_path = ydl.prepare_filename(result)
-                downloaded_paths.append(file_path)
-        else:
-            # Single video
-            result = ydl.process_ie_result(info, download=True)
-            file_path = ydl.prepare_filename(result)
-            downloaded_paths.append(file_path)
-
-    return downloaded_paths if not video_index else downloaded_paths[0]
 
 def _safe_basename_from_url(url: str) -> str:
     """Return a safe filename from a URL path component."""
@@ -360,11 +316,11 @@ def convert_video_to_webp(
     cmd.extend(["-i", input_video])
     cmd.extend([
         "-vf", chain,
-        #"-sws_flags", "lanczos+accurate_rnd+full_chroma_int",
+        "-sws_flags", "lanczos+accurate_rnd+full_chroma_int",
         "-loop", "0",
         "-c:v", "libwebp",
-        "-compression_level", "3",
-        "-q:v", str(min(70, max(50, webp_quality))),
+        "-compression_level", "9",
+        "-q:v", str(min(80, max(50, webp_quality))),
         "-preset", "default",
         "-f", "webp",
         "-metadata", "loop=0"
@@ -407,7 +363,7 @@ def build_preset(name: str):
         return dict(fps=12, colors=128, dither="bayer:bayer_scale=3", stats_mode_full=False, quality_boost=False, webp_quality=75, webp_lossless=False, max_size=300)
     if name == "medium":
         return dict(fps=16, colors=200, dither="sierra2_4a", stats_mode_full=True, quality_boost=False, webp_quality=80, webp_lossless=False, max_size=300)
-    return dict(fps=30, colors=256, dither="sierra2_4a", stats_mode_full=True, quality_boost=False, webp_quality=90, webp_lossless=False, max_size=400)
+    return dict(fps=24, colors=256, dither="sierra2_4a", stats_mode_full=True, quality_boost=True, webp_quality=90, webp_lossless=False, max_size=720)
 
 def parse_time(time_str: str) -> int:
     """Parse MM:SS time string into total seconds."""
@@ -432,9 +388,9 @@ def main():
     if args.end_time != "00:00":
         parse_time(args.end_time)
 
-    # Set default quality preset
+    # Set default quality to high
     preset = build_preset("high")
-    preset['fps'] = 60  # Override default 30fps
+    preset['fps'] = 24  # Override with default 30fps
 
     print(f"Processing: {args.url}")
     print(f"Time range: {args.start_time} to {args.end_time}")
@@ -444,9 +400,10 @@ def main():
         post_id = extract_post_id(args.url)
         output_dir = "output"
         os.makedirs(output_dir, exist_ok=True)
+
+        # Use provided output path
         out_name = args.output
 
-        # Analyze URL
         ydl_opts = {'quiet': True, 'noprogress': True, 'skip_download': True}
         info = None
         try:
@@ -458,9 +415,7 @@ def main():
 
         input_video = None
         temp_slideshow = None
-        downloaded_paths = []
 
-        # Detect image-only post
         if is_image_only_post(info):
             print("Detected image-only post. Creating slideshow...")
             with tempfile.TemporaryDirectory() as img_dir:
@@ -471,42 +426,21 @@ def main():
                 input_video = build_slideshow_video(images, temp_slideshow, fps=preset['fps'])
         else:
             print("Detected video post.")
+            downloaded_path = download_twitter_video(args.url, f"{post_id}.%(ext)s")
+            candidate = os.path.splitext(downloaded_path)[0] + ".mp4"
+            input_video = candidate if os.path.exists(candidate) else downloaded_path
 
-            # Detect /video/N for specific clip
-            m = re.search(r"/video/(\d+)", args.url)
-            specific_index = int(m.group(1)) if m else None
-
-            if specific_index:
-                print(f"Detected specific video index: {specific_index}")
-                downloaded_path = download_twitter_video(
-                    args.url,
-                    f"{post_id}_video{specific_index}.%(ext)s",
-                    video_index=specific_index
-                )
-                input_video = downloaded_path
-            else:
-                print("No specific video index provided. Downloading first available video...")
-                downloaded_paths = download_twitter_video(args.url, f"{post_id}_%(id)s.%(ext)s")
-                if not downloaded_paths:
-                    raise ValueError("No videos found in the post.")
-                input_video = downloaded_paths[0]
-
-            # Normalize to .mp4 if possible
-            base, _ = os.path.splitext(input_video)
-            candidate = base + ".mp4"
-            if os.path.exists(candidate):
-                input_video = candidate
-
-        # Handle trimming
+        # Handle time trimming
         start_time = None
         end_time = None
 
+        # If both start and end times are 00:00, check video duration
         if args.start_time == "00:00" and args.end_time == "00:00":
             video_duration = _get_video_duration(input_video)
             print(f"Video duration: {video_duration} seconds")
-            if video_duration > 8:
-                print("Video is longer than 8 seconds, limiting to 8 seconds")
-                end_time = "00:08"
+            if video_duration > 5:
+                print("Video is longer than 5 seconds, limiting to 5 seconds")
+                end_time = "00:05"
         elif args.start_time != "00:00" and args.end_time != "00:00":
             start_time = args.start_time
             end_time = args.end_time
@@ -515,8 +449,8 @@ def main():
         elif args.start_time == "00:00" and args.end_time != "00:00":
             end_time = args.end_time
 
-        # Convert to WebP
         print(f"Converting to WebP -> {out_name}")
+        # Ensure output directory exists
         os.makedirs(os.path.dirname(out_name), exist_ok=True)
 
         convert_video_to_webp(
@@ -534,22 +468,13 @@ def main():
 
         print(f"Done. Saved: {out_name}")
 
-        # Cleanup
+        # Clean up temporary files
         try:
-            if specific_index:
-                if input_video and os.path.exists(input_video):
-                    os.remove(input_video)
-                    print(f"Removed temp video: {input_video}")
-            else:
-                for path in downloaded_paths:
-                    if os.path.exists(path):
-                        os.remove(path)
-                        print(f"Removed temp video: {path}")
-            if temp_slideshow and os.path.exists(temp_slideshow):
-                os.remove(temp_slideshow)
-                print(f"Removed temp slideshow: {temp_slideshow}")
+            if input_video and os.path.exists(input_video):
+                os.remove(input_video)
+                print(f"Removed temporary video: {input_video}")
         except Exception as e:
-            print(f"Warning: could not remove temp files ({e})")
+            print(f"Warning: could not remove temp file ({e})")
 
     except subprocess.CalledProcessError as e:
         msg = "ffmpeg failed during conversion."

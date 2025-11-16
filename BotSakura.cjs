@@ -8,6 +8,8 @@ const {
     AttachmentBuilder
 } = require("discord.js");
 
+const { spawn } = require('child_process');
+
 // --- Environment Configuration ---
 require("dotenv").config({
     path: {
@@ -22,7 +24,7 @@ require("dotenv").config({
 const CONFIG = {
     TOKEN: process.env.DISCORD_TOKEN,
     PYTHON_API_URL: process.env.PYTHON_API_URL,
-    RENDER_API_KEY: process.env.RENDER_API_KEY,
+    RENDER_API_KEY: process.env.RENDER_API_KEY || "",
     RENDER_SERVICE_ID: process.env.RENDER_SERVICE_ID,
     SERVER_COOLDOWN: 15 * 1000, // 15 seconds
     SAME_COMMAND_PENALTY: 15 * 1000, // 15 seconds
@@ -32,6 +34,7 @@ const CONFIG = {
     // NEW: Cooldown buffer between processing queue items
     PROCESS_COOLDOWN: 30 * 1000, // 15 seconds
 };
+const PYTHON_CMD = process.env.CMD_PYTHON || "python";
 
 // --- Configuration Validation ---
 if (!CONFIG.TOKEN) {
@@ -178,6 +181,94 @@ async function useOnlineAPI(url, startTime, endTime, outputFile) {
     }
 }
 
+let shouldUseLocal = false;
+async function checkOnline() {
+    try {
+        const res = await fetch(`https://api.render.com/v1/services/${CONFIG.RENDER_SERVICE_ID}`, {
+            method: "GET",
+            headers: {
+                "authorization": `Bearer ${CONFIG.RENDER_API_KEY}`,
+                "accept": "application/json"
+            },
+        });
+        const isSuspended = await res.json().then((data) => {
+            if (data.suspended === 'suspended') {
+                return true;
+            }
+            return false;
+        });
+        shouldUseLocal = isSuspended;
+        console.log('[GIF] Check Ofline : ', shouldUseLocal);
+        if (isSuspended) {
+            console.log('[GIF] Check Ofline : ', shouldUseLocal, ' > Fallback local python code instead.');
+        }
+        return (!res.ok || isSuspended) ? false : true;
+    } catch (error) {
+        console.error("checkOnline api error:", error);
+        return false;
+    }
+}
+
+const activePythonProcesses = new Set();
+
+function useLocalPython(url, startTime, endTime, outputFile) {
+    return new Promise((resolve, reject) => {
+        // Declare pythonProcess with let so it's available in the timeout scope
+        let pythonProcess;
+
+        // Set timeout for the process (120 seconds)
+        const timeout = 120000;
+        const timer = setTimeout(() => {
+            if (pythonProcess) {
+                pythonProcess.kill('SIGTERM');
+                reject(new Error('Python process timed out after 120 seconds'));
+            }
+        }, timeout);
+
+        // Use spawn for better process control
+        pythonProcess = spawn(PYTHON_CMD, ['gif.py', url, startTime, endTime, outputFile]);
+
+        // Track the process for cleanup
+        activePythonProcesses.add(pythonProcess);
+
+        let stdoutData = '';
+        let stderrData = '';
+
+        pythonProcess.stdout.on('data', (data) => {
+            stdoutData += data.toString();
+        });
+
+        pythonProcess.stderr.on('data', (data) => {
+            stderrData += data.toString();
+        });
+
+        pythonProcess.on('close', (code) => {
+            clearTimeout(timer);
+            activePythonProcesses.delete(pythonProcess); // Remove from tracking
+
+            if (code !== 0) {
+                console.error(`Python process exited with code ${code}`);
+                console.error(`stderr: ${stderrData}`);
+                reject(new Error(`Python process failed with code ${code}`));
+                return;
+            }
+
+            console.log(`stdout: ${stdoutData}`);
+            if (stderrData) {
+                console.error(`stderr: ${stderrData}`);
+            }
+            resolve(outputFile);
+        });
+
+        pythonProcess.on('error', (error) => {
+            clearTimeout(timer);
+            console.error(`Error spawning Python process: ${error}`);
+            reject(error);
+        });
+    });
+}
+
+
 // MODIFIED: This function now just adds data to the queue and starts the processor if it's idle.
 function enqueueGifRequest(message, url, startTime, endTime) {
     const request = {
@@ -203,6 +294,9 @@ function enqueueGifRequest(message, url, startTime, endTime) {
  * It processes one item, waits for a cooldown, then calls itself to process the next.
  */
 async function processGifQueue() {
+    // ping online api to check status
+    await checkOnline();
+
     if (requestQueue.isEmpty()) {
         console.log(`[QUEUE] No queue, standing by for the next commands.`);
         isProcessingQueue = false;
@@ -231,7 +325,9 @@ async function processGifQueue() {
         outputFile = generateOutputFilename();
 
         console.log(`[GIF] Started processing ${url} for ${author.tag}.`);
-        const imageOutputFile = await useOnlineAPI(url, startTime, endTime, outputFile);
+        const imageOutputFile = !shouldUseLocal
+            ? await useOnlineAPI(url, startTime, endTime, outputFile)
+            : await useLocalPython(url, startTime, endTime, outputFile);
 
         const attachment = new AttachmentBuilder(imageOutputFile);
         await channel.send({
@@ -328,7 +424,7 @@ function parseTime(input) {
 
 // --- Bot Events ---
 
-client.once("clientReady", () => {
+client.once("clientReady", async () => {
     console.log(`[INFO] Logged in as ${client.user.tag}! Bot is ready.`);
     // setInterval(cleanupRateLimitMaps, CONFIG.RATE_LIMIT_CLEANUP_INTERVAL);
     // NEW: Kick off the queue processor once the bot is ready.
@@ -360,7 +456,7 @@ client.on("messageCreate", async (message) => {
         const match = message.content.match(enhancedRegex);
 
         if (match) {
-            const url = match[1].trim(); 
+            const url = match[1].trim();
             const timeStart = parseTime(match[2]) || '00:00';
             const timeEnd = parseTime(match[3]) || '00:00';
 
