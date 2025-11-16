@@ -144,3 +144,4 @@ dist
 cache/
 image-output/
 .clinerules/
+.DS_Store
