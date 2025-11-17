@@ -181,6 +181,35 @@ async function useOnlineAPI(url, startTime, endTime, outputFile) {
     }
 }
 
+async function useLocalAPI(url, startTime, endTime, outputFile) {
+    // use local python api server
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CONFIG.API_TIMEOUT);
+    try {
+        console.log(`[GIF] API : url=${url} | start_time=${startTime} | end_time=${endTime}`)
+        const res = await fetch(`http://127.0.0.1:5000/convert`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url, start_time: startTime, end_time: endTime }),
+            signal: controller.signal
+        });
+        if (!res.ok) {
+            const errorText = await res.text().catch(() => `Status code: ${res.status}`);
+            throw new Error(`Python API failed: ${errorText}`);
+        }
+        const buffer = Buffer.from(await res.arrayBuffer());
+        await fs.promises.writeFile(outputFile, buffer);
+        return outputFile;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error(`Python API request timed out after ${CONFIG.API_TIMEOUT / 1000} seconds.`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
 let shouldUseLocal = false;
 async function checkOnline() {
     try {
@@ -295,7 +324,7 @@ function enqueueGifRequest(message, url, startTime, endTime) {
  */
 async function processGifQueue() {
     // ping online api to check status
-    await checkOnline();
+    // await checkOnline();
 
     if (requestQueue.isEmpty()) {
         console.log(`[QUEUE] No queue, standing by for the next commands.`);
@@ -325,9 +354,12 @@ async function processGifQueue() {
         outputFile = generateOutputFilename();
 
         console.log(`[GIF] Started processing ${url} for ${author.tag}.`);
-        const imageOutputFile = !shouldUseLocal
-            ? await useOnlineAPI(url, startTime, endTime, outputFile)
-            : await useLocalPython(url, startTime, endTime, outputFile);
+
+        // const imageOutputFile = !shouldUseLocal
+        //     ? await useOnlineAPI(url, startTime, endTime, outputFile)
+        //     : await useLocalPython(url, startTime, endTime, outputFile);
+
+        const imageOutputFile = await useLocalAPI(url, startTime, endTime, outputFile);
 
         const attachment = new AttachmentBuilder(imageOutputFile);
         await channel.send({
@@ -445,7 +477,8 @@ client.on("messageCreate", async (message) => {
             "\n**Example (from 5s to 10s):**\n`!gif https://x.com/user/status/123456789 00:05 00:10`\n" +
             "\n**Note**:\n" +
             "- Bot can process up to **5 seconds** of gif (of your selected time frame), Do not use long clip it may cause bot timed out.\n" +
-            "- Bot will tagging you once your reqeuest is done.";
+            "- Bot will tagging you once your reqeuest is done.\n" +
+            "- Rate limits may apply based on server load.";
 
         if (message.content.toLowerCase().trim() === "!gif help") {
             await message.reply(helpMsg);
