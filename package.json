@@ -7,7 +7,11 @@
     "start": "node BotShiro.js",
     "start:blue": "cross-env NODE_ENV=blue node BotShiro.js",
     "start:staging": "cross-env NODE_ENV=staging node BotShiro.js",
-    "start:prod": "cross-env NODE_ENV=production node BotShiro.js"
+    "start:prod": "cross-env NODE_ENV=production node BotShiro.js",
+    "saito": "node BotSaito.cjs",
+    "saito:prod": "cross-env NODE_ENV=production node BotSaito.cjs",
+    "sakura": "node BotSakura.cjs",
+    "sakura:prod": "cross-env NODE_ENV=production node BotSakura.cjs"
   },
   "keywords": [],
   "author": "",
@@ -15,7 +19,7 @@
   "description": "",
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
-    "discord.js": "^14.19.2",
+    "discord.js": "14.24.2",
     "dotenv": "^16.5.0"
   },
   "devDependencies": {

@@ -142,3 +142,6 @@ dist
 .vscode
 
 cache/
+image-output/
+.clinerules/
+.DS_Store

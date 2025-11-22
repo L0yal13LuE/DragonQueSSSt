@@ -72,6 +72,9 @@ const {
   handleCraftListButtonClick,
 } = require("./managers/craftPaginationManager.js");
 const fortuneTeller = require('./managers/fortuneTeller'); 
+const {
+  handlePetCommand
+} = require("./managers/petManager.js");
 
 // --- Configuration ---
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -112,7 +115,8 @@ const clanShopSettingData = new Map();
 let clanCraftSettingData = [];
 
 // --- Bot Ready Event ---
-client.once("ready", async () => {
+// client.once("ready", async () => {
+client.once("clientReady", async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
   // Initialize Bot Channels
@@ -591,6 +595,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         break;
       case "game-assemble-xx":
         await handleAssembleCommand(interaction); // Keep using the imported manager
+        break;
+      case "pet":
+        await handlePetCommand(interaction); // Handle pet command
         break;
     }
   } catch (error) {
