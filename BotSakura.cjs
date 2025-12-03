@@ -489,7 +489,21 @@ client.on("messageCreate", async (message) => {
         const match = message.content.match(enhancedRegex);
 
         if (match) {
-            const url = match[1].trim();
+            let url = match[1].trim();
+
+            // clean up url domains proxy
+            const domainsToReplace = [
+                'fxtwitter.com',
+                'twittpr.com',
+                'fixupx.com',
+                'xfixup.com',
+            ];
+            for (const domain of domainsToReplace) {
+                // Regex to match the protocol, optional subdomains, and the main domain, preserving the protocol in group $1
+                const regex = new RegExp(`(https?:\/\/)(?:[a-z0-9-]+\.)*${domain.replace('.', '\\.')}`, 'i');
+                url = url.replace(regex, '$1x.com');
+            }
+
             const timeStart = parseTime(match[2]) || '00:00';
             const timeEnd = parseTime(match[3]) || '00:00';
 
