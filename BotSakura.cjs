@@ -358,7 +358,7 @@ async function processGifQueue() {
 
         const imageOutputFile = await useLocalAPI(url, startTime, endTime, outputFile);
         const attachment = new AttachmentBuilder(imageOutputFile);
-        const successMessage = `😉 อ่ะนี่! ${author.toString()} พอใจแล้วใช่ไหมล่ะ! ขอโทษที่ทำให้เธอรอนานนะ ❤️`;
+        const successMessage = `${author.toString()} 👇`;
         await channel.send({
             content: successMessage,
             files: [attachment]
@@ -379,7 +379,7 @@ async function processGifQueue() {
         try {
             // If we fetched the channel, try to send the error message there.
             if (channel) {
-                const fullErrorMessage = truncateMessage(`${author.toString()}, 😭 แง๊ๆมัน Error ง่ะ ตามนี้เลย เดี๋ยวให้ dev มาดูเองละกัน 😔 : ${errorMessage}`);
+                const fullErrorMessage = truncateMessage(`${author.toString()}, 😭 Error ง่ะ ตามนี้เลย เดี๋ยวให้ dev มาดูเองละกัน 😔 : ${errorMessage}`);
                 await channel.send({ content: fullErrorMessage });
             }
         } catch (replyError) {
@@ -514,7 +514,7 @@ client.on("messageCreate", async (message) => {
 
             //  Enqueue the request and immediately reply to the user.
             const queuePosition = enqueueGifRequest(message, url, timeStart, timeEnd);
-            let responseMessage = `✅ ได้รับคำขอแล้วจ้า! ถ้าเสร็จแล้วจะแท็กไปนะ`;
+            let responseMessage = `👌 Request received.`;
             if (currentlyProcessing) {
                 // Use <URL> to prevent Discord from creating a large embed for the URL
                 // responseMessage += `\nซึ่งตอนนี้เรากำลังทำไฟล์ของ <${currentlyProcessing.url}> ของ **${currentlyProcessing.author.username}** อยู่น่ะ`;
