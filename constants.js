@@ -28,6 +28,15 @@ let EXP_PER_CHARACTER = 1;
 let LEVELING_FACTOR = 10;
 let ANNOUNCEMENT_CHANNEL_ID = 1366780291380678737;
 
+const GET_CHANCE = function (chancePercentage) {
+  if (typeof chancePercentage !== 'number' || chancePercentage < 0 || chancePercentage > 100) {
+    console.error("Invalid input: Please provide a number between 0 and 100.");
+    return false;
+  }
+  const probability = chancePercentage / 100;
+  return Math.random() < probability;
+}
+
 // --- Cat Language Replies ---
 const catReplies = [
   "Meow?",
@@ -65,4 +74,5 @@ module.exports = {
   CACHE_LEADERBOARD_MONSTER_KILL_TTL_MS,
   CACHE_ASSEMBLE_PREFIX,
   CACHE_ASSEMBLE_TTL_MS,
+  GET_CHANCE
 };
