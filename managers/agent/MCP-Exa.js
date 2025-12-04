@@ -5,7 +5,7 @@ require("dotenv").config({
 
 // --- Configuration & Constants ---
 const CONFIG = {
-    API_URL: "https://api.exa.ai/search",
+    API_URL: "https://api.exa.ai",
     API_KEY: process.env.EXA_API_KEY || "ERROR",
 };
 
@@ -44,7 +44,7 @@ async function callAPI(userQuery) {
 
     try {
         // 3. API Call
-        const response = await fetch(CONFIG.API_URL, {
+        const response = await fetch(`${CONFIG.API_URL}/search`, {
             method: "POST",
             headers: {
                 "content-type": "application/json",
@@ -72,8 +72,7 @@ async function callAPI(userQuery) {
 
         // 5. Response Parsing
         const data = await response.json();
-        return data.context;
-
+        return data.context || "";
     } catch (error) {
         console.error("[EXA] Failed:", error);
         return ``;
