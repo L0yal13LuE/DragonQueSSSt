@@ -1,6 +1,7 @@
 // fortuneTeller.js
 const AGENT = require('./agent/0-Shiro');
 const AGENT_B = require('./agent/1-Assistant');
+const MCP_EXA = require('./agent/MCP-Exa');
 const CONSTANTS = require("./../constants");
 
 // --- Custom Queue Implementation (Linked List based) ---
@@ -107,9 +108,11 @@ async function processQueue() {
     try {
         const userContxt = message.content;
         const getTrustAI = CONSTANTS.GET_CHANCE(100);
+
         if (getTrustAI) {
             console.log('[Fortune] Using Trust Agent', true);
-            const responseAiResult = await AGENT_B.callAPI(userContxt);
+            const mcpContext = await MCP_EXA.callAPI(userContxt);
+            const responseAiResult = await AGENT_B.callAPI(mcpContext, userContxt);
             if (responseAiResult.indexOf('[callAgentTrustSource] Failed') !== -1) {
                 console.log('[Fortune] Using Trust Agent : Fail -> Using Groq backup call');
                 const backupResponseCall = await AGENT.callAPI(userContxt);

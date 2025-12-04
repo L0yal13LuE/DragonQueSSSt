@@ -81,7 +81,7 @@ const parseAgentResponse = (data) => {
  * @param {string} userQuery - The text input from the user.
  * @returns {Promise<string>} - The agent's response or an error message.
  */
-async function callAPI(userQuery) {
+async function callAPI(mcpContext, userQuery) {
     // 1. Validation
     if (!CONFIG.API_KEY || CONFIG.API_KEY === "ERROR") {
         console.error("Critical: MISTRAL_API_KEY is missing.");
@@ -163,6 +163,10 @@ async function callAPI(userQuery) {
             body: JSON.stringify({
                 agent_id: CONFIG.AGENT_ID.toString(),
                 messages: [
+                    {
+                        role: "user",
+                        content: `Addition resource that can help with the task, feel free to use this information:\n${mcpContext?mcpContext:''}`
+                    },
                     {
                         role: "user",
                         content: userQuery.replace('0 ', '').toString().trim()
