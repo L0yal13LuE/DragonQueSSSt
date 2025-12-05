@@ -151,7 +151,7 @@ async function _callByDate(maxResult, userQuery, dateParams) {
                     "startPublishedDate": start_date,
                     "endPublishedDate": end_date,
                     "type": "auto",
-                    "userLocation": "TH",
+                    // "userLocation": "TH",
                     "moderation": true,
                     "contents": {
                         "summary": {
@@ -196,11 +196,11 @@ async function callAPI(responseToolUse) {
 
         const dateCustom = getDateRange('custom', 'YYYY-MM-DD', parseInt(responseToolUse.date));
         // console.log('[EXA] dateCustom', dateCustom);
-        const responseA = await _callByDate(10, responseToolUse.suggest, dateCustom);
-        // console.log('[EXA] Result', responseA !== '');
+        const responseText = await _callByDate(15, responseToolUse.suggest, dateCustom);
+        console.log('[EXA] Produce Result', responseA !== '');
 
-        if (responseA !== "") {
-            contextCombine.push(`Date: last ${responseToolUse.date} days (${dateCustom.start_date} - ${dateCustom.end_date})\nInformation:\n` + responseA);
+        if (responseText !== "") {
+            contextCombine.push(`Date: last ${responseToolUse.date} days (${dateCustom.start_date} - ${dateCustom.end_date})\nInformation:\n` + responseText);
         }
         return contextCombine.join('\n\n');
     } catch (error) {

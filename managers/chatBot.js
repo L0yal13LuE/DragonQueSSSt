@@ -20,7 +20,7 @@ async function handleFortuneRequest(message) {
 
         // 2. Decision Logic
         const responseToolUse = await SEARCH_DECISION.callAPI(userContxt);
-        console.log("[EXA]", responseToolUse);
+        console.log("[Search-Decision]", responseToolUse);
 
         if (getTrustAI && responseToolUse.tool === 'SEARCH') {
             await thinkingMessage.edit("🤯 ค้นหาข้อมูลหน่อยซิ มีอะไรน่าสนใจบ้างนะ‼️");
