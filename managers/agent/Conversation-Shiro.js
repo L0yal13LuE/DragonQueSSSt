@@ -1,6 +1,22 @@
+// Groq Inference 
+// Note : Groq api cannot run via VPN on host server
+const path = require("path");
+require("dotenv").config({
+    path: getEnvPath(),
+});
+function getEnvPath() {
+    const envMap = {
+        blue: ".env.blue",
+        development: ".env",
+        staging: ".env.staging",
+        production: ".env.production",
+    };
+    return envMap[process.env.NODE_ENV || "development"];
+}
+
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_MODEL = 'openai/gpt-oss-120b';
-const CONSTANTS = require("./../../constants");
+const CONSTANTS = require("../../constants");
 
 /**
  * Calls the Groq AI API to generate a fortune based on user's message.
@@ -105,6 +121,9 @@ async function callAPI(userMessageContent) {
     ];
 
     try {
+
+        // console.log("GROQ_API_KEY >> ", GROQ_API_KEY)
+
         // Using the native fetch API available in Node.js 18+
         const response = await fetch(endpoint, {
             method: 'POST',
@@ -126,6 +145,7 @@ async function callAPI(userMessageContent) {
             }),
         });
         if (!response.ok) {
+            // console.log("ERROR RESPONSE", response);
             throw new Error(`Groq API error: ${response.status} ${response.statusText}`);
         }
         const data = await response.json();

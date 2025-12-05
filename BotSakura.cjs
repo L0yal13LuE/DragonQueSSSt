@@ -514,7 +514,7 @@ client.on("messageCreate", async (message) => {
 
             //  Enqueue the request and immediately reply to the user.
             const queuePosition = enqueueGifRequest(message, url, timeStart, timeEnd);
-            let responseMessage = `👌 Request received.`;
+            let responseMessage = `👌 OK รอแป๊บจ้า`;
             if (currentlyProcessing) {
                 // Use <URL> to prevent Discord from creating a large embed for the URL
                 // responseMessage += `\nซึ่งตอนนี้เรากำลังทำไฟล์ของ <${currentlyProcessing.url}> ของ **${currentlyProcessing.author.username}** อยู่น่ะ`;

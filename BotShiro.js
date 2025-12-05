@@ -71,7 +71,7 @@ const {
   handleCraftListInteraction,
   handleCraftListButtonClick,
 } = require("./managers/craftPaginationManager.js");
-const fortuneTeller = require('./managers/fortuneTeller'); 
+const chatBot = require('./managers/chatBot.js'); 
 const {
   handlePetCommand
 } = require("./managers/petManager.js");
@@ -389,31 +389,17 @@ client.on("messageCreate", async (message) => {
     // --- ADD BOT MENTION CHECK HERE ---
     // Check if the bot user was specifically mentioned (not @everyone or a role)
     if (message.mentions.has(client.user) && !message.mentions.everyone) {
-      // Select a random cat reply
-      // const randomIndex = Math.floor(
-      //   Math.random() * CONSTANTS.catReplies.length
-      // );
-      // const replyText = CONSTANTS.catReplies[randomIndex];
-      // try {
-      //   await message.reply(replyText);
-      //   console.log(
-      //     `[${message.author.username}] Mentioned the bot. Replied with: ${replyText}`
-      //   );
-      // } catch (error) {
-      //   console.error("Error sending cat reply:", error);
-      // }
-      // return;
-
-      // New AI calling perk
-      // Enqueue the request using the exported function
-      const currentQueueSize = fortuneTeller.enqueueRequest(message);
+      // Enqueue the request
+      // This automatically triggers the process if the queue was empty
+      const currentQueueSize = chatBot.enqueueRequest(message);
       console.log(`[Fortune] Added request from ${message.author.tag} to the queue. Queue length: ${currentQueueSize}`);
-      if (currentQueueSize > 1 && !fortuneTeller.getIsProcessingQueue()) {
-          await message.reply("⏳ I'm currently consulting the celestial spheres for another's destiny. Please wait a moment, I'll get to your fortune as soon as possible!");
-      } else if (!fortuneTeller.getIsProcessingQueue()) {
-          await message.channel.sendTyping(); 
-      }
-      fortuneTeller.processQueue();
+
+      // LOGIC:
+      // If Size > 1: The bot is busy with someone else. Tell user to wait.
+      // If Size == 1: The bot starts immediately. 
+      if (currentQueueSize > 1) {
+          await message.reply("รอสักครู่... ตอบแน่แต่ช้าหน่อย 🫠");
+      } 
     }
     // --- END BOT MENTION CHECK ---
 
