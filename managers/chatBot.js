@@ -3,6 +3,7 @@ const AGENT = require('./agent/Conversation-Shiro');
 const AGENT_B = require('./agent/Conversation-Assistant2');
 const MCP_EXA = require('./agent/MCP-Exa');
 const SEARCH_DECISION = require('./agent/Search-Decision');
+const SEARCH_GOOGLE = require('./agent/Search-Google');
 const AsyncQueue = require('./utils/AsyncQueue'); // Ensure you have the file created in previous step
 
 // --- Worker Function ---
@@ -22,20 +23,53 @@ async function handleFortuneRequest(message) {
         const responseToolUse = await SEARCH_DECISION.callAPI(userContxt);
         console.log("[Search-Decision]", responseToolUse);
 
+
         if (getTrustAI && responseToolUse.tool === 'SEARCH') {
-            await thinkingMessage.edit("🤯 ค้นหาข้อมูลหน่อยซิ มีอะไรน่าสนใจบ้างนะ‼️");
-            const mcpContext = await MCP_EXA.callAPI(responseToolUse);
-            
-            await thinkingMessage.edit("🤭 กำลังจะมาแล้ว อีกนิ๊สสส...");
+            await thinkingMessage.edit("🤯 ขอค้นหาข้อมูลหน่อยนะ มีอะไรน่าสนใจบ้างหนอ");
+
+            // TYPE 1 : EXA FIRST
+            // Priority 1
+            // let mcpContext = await MCP_EXA.callAPI(responseToolUse);
+            // console.log("[EXA]", mcpContext !== '');
+
+            // // Priority 2 Only trigger google if EXA MCP fail
+            // if (mcpContext == "") {
+            //     const googleContext = await SEARCH_GOOGLE.callAPI(message.guild.id, responseToolUse);
+            //     console.log("[Google]", googleContext !== '');
+            //     mcpContext = googleContext;
+            // }
+
+            // TYPE 2 : GOOGLE FIRST
+            // Priority 1
+            let mcpContext = await SEARCH_GOOGLE.callAPI(message.guild.id, responseToolUse);
+            console.log("[Google]", mcpContext !== '');
+
+            // Priority 2 Only trigger google if EXA MCP fail
+            if (mcpContext == "") {
+                const exaContext = await MCP_EXA.callAPI(responseToolUse);
+                console.log("[EXA]", exaContext !== '');
+                mcpContext = exaContext;
+            }
+
+            await thinkingMessage.edit("🤭 กำลังจะมาแล้ว รออีกนิ๊สสส...");
             const responseAiResult = await AGENT_B.callAPI(mcpContext, userContxt);
-           
-            await thinkingMessage.edit(responseAiResult);
+
+            // Check length for Discord limit
+            if (responseAiResult.length > 2000) {
+                await thinkingMessage.edit('นี่จ้า... 👇');
+                const chunks = responseAiResult.match(/[\s\S]{1,1900}/g) || [];
+                for (const chunk of chunks) {
+                    await message.reply(chunk);
+                }
+            } else {
+                await thinkingMessage.edit(responseAiResult);
+            }
         } else {
             console.log('[Fortune] GROQ');
-            const fortune = await AGENT.callAPI(userContxt); 
-            
+            const fortune = await AGENT.callAPI(userContxt);
+
             // Artificial delay
-            await new Promise(resolve => setTimeout(resolve, 300)); 
+            await new Promise(resolve => setTimeout(resolve, 300));
             await thinkingMessage.edit(fortune);
         }
     } catch (error) {
@@ -74,7 +108,7 @@ function getQueueSize() {
 // Export everything including processQueue
 module.exports = {
     enqueueRequest,
-    processQueue, 
+    processQueue,
     getIsProcessingQueue,
     getQueueSize,
 };

@@ -122,17 +122,18 @@ function getDateRange(period, formatType = 'YYYY-MM-DD', customDay) {
 async function _callByDate(maxResult, userQuery, dateParams) {
     // 1. Validation
     if (!CONFIG.API_KEY || CONFIG.API_KEY === "ERROR") {
-        console.error("Critical: MISTRAL_API_KEY is missing.");
+        console.error("[EXA] Critical: EXA KEY is missing.");
         return "";
     }
 
     if (!userQuery || typeof userQuery !== "string" || !userQuery.trim()) {
+        console.error("[EXA] Query is empty.");
         return "";
     }
 
     try {
-        const { start_date, end_date } = dateParams; // ex: getDateRange('last_30', 'YYYY-MM-DD');
-
+        const { start_date, end_date } = dateParams;
+        console.log("[EXA] Searching...");
         // 3. API Call
         const response = await fetch(`${CONFIG.API_URL}/search`, {
             method: "POST",
@@ -143,7 +144,7 @@ async function _callByDate(maxResult, userQuery, dateParams) {
             body: JSON.stringify(
                 {
                     "query": userQuery,
-                    "category": "news",
+                    // "category": "news",
                     "startCrawlDate": start_date,
                     "endCrawlDate": end_date,
                     "excludeDomains": ["facebook.com", "reddit.com", "tiktok.com", "instagram.com"],
@@ -155,9 +156,9 @@ async function _callByDate(maxResult, userQuery, dateParams) {
                     "moderation": true,
                     "contents": {
                         "summary": {
-                            "query": "Only use plain text format."
+                            "query": "# Task\nSummary the context without other properties\n\n# Output Format\n{short to middle summary or key take away}\n\n# Rules (Must follow)\n- Use English only. If the source language is not an English then translate it.\n- Use only plain text format no bold, markdown just pure text with simple lines breaking.\n"
                         },
-                        "context": true
+                        //"context": true
                     }
                 }
             ),
@@ -171,10 +172,16 @@ async function _callByDate(maxResult, userQuery, dateParams) {
 
         // 5. Response Parsing
         const data = await response.json();
-        return data.context || "";
+        const reponseContext = data.results?.map(e => e.summary).join("\n\n") || "";
+
+        // console.log("[EXA] Produce Result >>" , reponseContext && reponseContext !== '');
+
+        return reponseContext;
+
+        // return data.context || "";
     } catch (error) {
         console.error("[EXA] Failed 2:", error);
-        return ``;
+        return "";
     }
 }
 
@@ -188,17 +195,10 @@ async function _callByDate(maxResult, userQuery, dateParams) {
  */
 async function callAPI(responseToolUse) {
     try {
-
-        // console.log('[EXA] responseToolUse', responseToolUse);
         let contextCombine = [];
-
         if (responseToolUse.date <= 0) responseToolUse.date = 60;
-
         const dateCustom = getDateRange('custom', 'YYYY-MM-DD', parseInt(responseToolUse.date));
-        // console.log('[EXA] dateCustom', dateCustom);
-        const responseText = await _callByDate(15, responseToolUse.suggest, dateCustom);
-        console.log('[EXA] Produce Result', responseA !== '');
-
+        const responseText = await _callByDate(10, responseToolUse.suggest, dateCustom);
         if (responseText !== "") {
             contextCombine.push(`Date: last ${responseToolUse.date} days (${dateCustom.start_date} - ${dateCustom.end_date})\nInformation:\n` + responseText);
         }

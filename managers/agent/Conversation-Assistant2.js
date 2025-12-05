@@ -233,16 +233,22 @@ async function callAPI(mcpContext, userQuery) {
 
         // 5. Response Parsing
         const data = await response.json();
-        // console.log("[AGENT2] OK >", data);
-        const responseTxt = data.choices[0].message.content || "Sorry I can't answer that.";
+        // console.log("[AGENT2] OK >", JSON.stringify(data, null, 4));
+        // return "ok";
+        let responseTxt = "";
+        if (Array.isArray(data.choices[0].message.content)) {
+            responseTxt = data.choices[0].message.content.find(e => e.type === 'text')?.text || "Sorry I can't answer that."
+        } else {
+            responseTxt = data.choices[0].message.content || "Sorry I can't answer that."
+        }
 
         // Remove all markdown formatting (e.g., **bold**) to ensure plain text output.
         const STRIP_MARKDOWN_PATTERN = /\*\*(.*?)\*\*/g;
         const cleanedResponse = typeof responseTxt === 'string'
             ? responseTxt.replace(STRIP_MARKDOWN_PATTERN, '$1')
             : responseTxt;
-        const reponseTrimmed = truncateText(cleanedResponse, 1990);
-        return reponseTrimmed;
+        // const reponseTrimmed = truncateText(cleanedResponse, 1990);
+        return cleanedResponse;
 
     } catch (error) {
         console.error("[callAgentTrustSource] Failed:", error);
