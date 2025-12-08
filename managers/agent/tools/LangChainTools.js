@@ -1,10 +1,8 @@
 const { DynamicStructuredTool } = require("@langchain/core/tools");
 const { ChatGoogleGenerativeAI } = require("@langchain/google-genai");
-// --- FIX START ---
-// We try to get .default (standard for ESM-to-CJS), fallback to the module itself
-const ExaPkg = require("exa-js");
-const Exa = ExaPkg.default || ExaPkg;
-// --- FIX END ---
+
+const TOOL_EXA = require('./SearchExaTool')
+
 const { z } = require("zod");
 const path = require("path");
 require("dotenv").config({ path: getEnvPath() });
@@ -30,8 +28,8 @@ function getDateRange(days) {
 
 // --- Tool 1: Exa Search (Native SDK) ---
 // Initialize Client (Safely checks if API Key exists to prevent crash on startup)
-const exaApiKey = process.env.EXA_API_KEY;
-const exaClient = exaApiKey ? new Exa(exaApiKey) : null;
+// const exaApiKey = process.env.EXA_API_KEY;
+// const exaClient = exaApiKey ? new Exa(exaApiKey) : null;
 
 const exaSearchTool = new DynamicStructuredTool({
     name: "exa_search",
@@ -41,22 +39,17 @@ const exaSearchTool = new DynamicStructuredTool({
         days: z.number().describe("Days to look back (0, 1, 7, etc.)"),
     }),
     func: async ({ query, days }) => {
-        if (!exaClient) return "Error: EXA_API_KEY is missing in .env";
-        const { startDate, endDate } = getDateRange(days);
-        
-        try {
-            console.log(`[Exa] Searching: "${query}" (${startDate} to ${endDate})`);
-            const result = await exaClient.searchAndContents(query, {
-                startCrawlDate: startDate,
-                endCrawlDate: endDate,
-                numResults: 10,
-                type: "auto",
-                excludeDomains: ["facebook.com", "reddit.com", "tiktok.com", "instagram.com"],
-                summary: { query: "Summary relevant to query" }
-            });
+        if (!process.env.EXA_API_KEY) return "Error: EXA_API_KEY is missing in .env";
 
-            if (!result.results?.length) return "No results found.";
-            return result.results.map(r => `Title: ${r.title}\nSummary: ${r.summary}`).join("\n\n");
+        console.log("exaSearchTool : query", query, days);
+        try {
+            const dt = await TOOL_EXA.callAPI({
+                tool: "SEARCH",
+                suggest: query,
+                date: days
+            });
+            console.log(JSON.stringify(dt, null,4))
+            return dt;
         } catch (error) {
             console.error("[Exa] Error:", error);
             return "Failed to fetch from Exa.";
@@ -67,7 +60,7 @@ const exaSearchTool = new DynamicStructuredTool({
 // --- Tool 2: Google Search (Native Grounding) ---
 const googleModel = new ChatGoogleGenerativeAI({
     apiKey: process.env.GEMINI_API_KEY,
-    model: "gemini-2.0-flash-exp", 
+    model: "gemini-2.5-flash-lite", 
     temperature: 0.5,
     googleSearchRetrieval: { disableAttribution: false }, 
 });
