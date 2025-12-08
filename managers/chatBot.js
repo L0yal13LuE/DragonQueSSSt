@@ -1,9 +1,9 @@
 const CONSTANTS = require("../constants");
-const AGENT = require('./agent/Conversation-Shiro');
+const AGENT_A = require('./agent/Conversation-Shiro');
 const AGENT_B = require('./agent/Conversation-Assistant2');
-const MCP_EXA = require('./agent/MCP-Exa');
-const SEARCH_DECISION = require('./agent/Search-Decision');
-const SEARCH_GOOGLE = require('./agent/Search-Google');
+const TOOL_EXA = require('./agent/tools/SearchExaTool');
+const TOOL_SEARCH_DECISION = require('./agent/tools/SearchDecisionTool');
+const TOOL_SEARCH_GOOGLE = require('./agent/tools/SearchGoogleTool');
 const AsyncQueue = require('./utils/AsyncQueue'); // Ensure you have the file created in previous step
 
 // --- Worker Function ---
@@ -20,7 +20,7 @@ async function handleFortuneRequest(message) {
         const getTrustAI = CONSTANTS.GET_CHANCE(100);
 
         // 2. Decision Logic
-        const responseToolUse = await SEARCH_DECISION.callAPI(userContxt);
+        const responseToolUse = await TOOL_SEARCH_DECISION.callAPI(userContxt);
         console.log("[Search-Decision]", responseToolUse);
 
 
@@ -29,24 +29,24 @@ async function handleFortuneRequest(message) {
 
             // TYPE 1 : EXA FIRST
             // Priority 1
-            // let mcpContext = await MCP_EXA.callAPI(responseToolUse);
+            // let mcpContext = await TOOL_EXA.callAPI(responseToolUse);
             // console.log("[EXA]", mcpContext !== '');
 
             // // Priority 2 Only trigger google if EXA MCP fail
             // if (mcpContext == "") {
-            //     const googleContext = await SEARCH_GOOGLE.callAPI(message.guild.id, responseToolUse);
+            //     const googleContext = await TOOL_SEARCH_GOOGLE.callAPI(message.guild.id, responseToolUse);
             //     console.log("[Google]", googleContext !== '');
             //     mcpContext = googleContext;
             // }
 
             // TYPE 2 : GOOGLE FIRST
             // Priority 1
-            let mcpContext = await SEARCH_GOOGLE.callAPI(message.guild.id, responseToolUse);
+            let mcpContext = await TOOL_SEARCH_GOOGLE.callAPI(message.guild.id, responseToolUse);
             console.log("[Google]", mcpContext !== '');
 
             // Priority 2 Only trigger google if EXA MCP fail
             if (mcpContext == "") {
-                const exaContext = await MCP_EXA.callAPI(responseToolUse);
+                const exaContext = await TOOL_EXA.callAPI(responseToolUse);
                 console.log("[EXA]", exaContext !== '');
                 mcpContext = exaContext;
             }
@@ -66,7 +66,7 @@ async function handleFortuneRequest(message) {
             }
         } else {
             console.log('[Fortune] GROQ');
-            const fortune = await AGENT.callAPI(userContxt);
+            const fortune = await AGENT_A.callAPI(userContxt);
 
             // Artificial delay
             await new Promise(resolve => setTimeout(resolve, 300));
