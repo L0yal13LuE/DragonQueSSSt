@@ -145,7 +145,7 @@ async function callAPI(userMessageContent) {
             }),
         });
         if (!response.ok) {
-            // console.log("ERROR RESPONSE", response);
+            console.log("ERROR RESPONSE", response);
             throw new Error(`Groq API error: ${response.status} ${response.statusText}`);
         }
         const data = await response.json();

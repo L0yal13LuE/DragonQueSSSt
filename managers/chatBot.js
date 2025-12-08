@@ -1,114 +1,44 @@
-const CONSTANTS = require("../constants");
-const AGENT_A = require('./agent/Conversation-Shiro');
-const AGENT_B = require('./agent/Conversation-Assistant2');
-const TOOL_EXA = require('./agent/tools/SearchExaTool');
-const TOOL_SEARCH_DECISION = require('./agent/tools/SearchDecisionTool');
-const TOOL_SEARCH_GOOGLE = require('./agent/tools/SearchGoogleTool');
-const AsyncQueue = require('./utils/AsyncQueue'); // Ensure you have the file created in previous step
+const AGENT = require('./agent/LangChainProcessor');
+const AsyncQueue = require('./utils/AsyncQueue');
 
-// --- Worker Function ---
-// This contains the specific Fortune Telling logic
 async function handleFortuneRequest(message) {
-    console.log(`[Fortune] Processing request for ${message.author.tag}.`);
-
-    // 1. Initial Discord UI Feedback
+    // 1. Send "Thinking" state
     await message.channel.sendTyping();
-    let thinkingMessage = await message.reply("🤔 หือ... ไปวนรอบโลกแป๊บเดี๋ยวมา... 💫");
+    let replyMsg = await message.reply("🤔 หือ... ไปวนรอบโลกแป๊บเดี๋ยวมา... 💫");
 
     try {
-        const userContxt = message.content;
-        const getTrustAI = CONSTANTS.GET_CHANCE(100);
 
-        // 2. Decision Logic
-        const responseToolUse = await TOOL_SEARCH_DECISION.callAPI(userContxt);
-        console.log("[Search-Decision]", responseToolUse);
+        const cleanText = message.content.replace(/<@\d+>/g, '').trim();
 
+        // 2. Process via LangChain Agent
+        const responseText = await AGENT.processUserMessage(cleanText);
 
-        if (getTrustAI && responseToolUse.tool === 'SEARCH') {
-            await thinkingMessage.edit("🤯 ขอค้นหาข้อมูลหน่อยนะ มีอะไรน่าสนใจบ้างหนอ");
+        // 3. Handle Long Messages (Discord 2000 char limit)
+        if (responseText.length > 2000) {
+            const chunks = responseText.match(/[\s\S]{1,1900}/g) || [];
 
-            // TYPE 1 : EXA FIRST
-            // Priority 1
-            // let mcpContext = await TOOL_EXA.callAPI(responseToolUse);
-            // console.log("[EXA]", mcpContext !== '');
+            // Edit first message with first chunk
+            await replyMsg.edit(chunks[0]);
 
-            // // Priority 2 Only trigger google if EXA MCP fail
-            // if (mcpContext == "") {
-            //     const googleContext = await TOOL_SEARCH_GOOGLE.callAPI(message.guild.id, responseToolUse);
-            //     console.log("[Google]", googleContext !== '');
-            //     mcpContext = googleContext;
-            // }
-
-            // TYPE 2 : GOOGLE FIRST
-            // Priority 1
-            let mcpContext = await TOOL_SEARCH_GOOGLE.callAPI(message.guild.id, responseToolUse);
-            console.log("[Google]", mcpContext !== '');
-
-            // Priority 2 Only trigger google if EXA MCP fail
-            if (mcpContext == "") {
-                const exaContext = await TOOL_EXA.callAPI(responseToolUse);
-                console.log("[EXA]", exaContext !== '');
-                mcpContext = exaContext;
-            }
-
-            await thinkingMessage.edit("🤭 กำลังจะมาแล้ว รออีกนิ๊สสส...");
-            const responseAiResult = await AGENT_B.callAPI(mcpContext, userContxt);
-
-            // Check length for Discord limit
-            if (responseAiResult.length > 2000) {
-                await thinkingMessage.edit('นี่จ้า... 👇');
-                const chunks = responseAiResult.match(/[\s\S]{1,1900}/g) || [];
-                for (const chunk of chunks) {
-                    await message.reply(chunk);
-                }
-            } else {
-                await thinkingMessage.edit(responseAiResult);
+            // Send remaining chunks
+            for (let i = 1; i < chunks.length; i++) {
+                await message.channel.send(chunks[i]);
             }
         } else {
-            console.log('[Fortune] GROQ');
-            const fortune = await AGENT_A.callAPI(userContxt);
-
-            // Artificial delay
-            await new Promise(resolve => setTimeout(resolve, 300));
-            await thinkingMessage.edit(fortune);
+            await replyMsg.edit(responseText);
         }
+
     } catch (error) {
-        console.error("[Fortune] Logic Error:", error);
-        await thinkingMessage.edit("A cosmic disturbance has interfered with my vision! Please try again later.");
+        console.error("Bot Error:", error);
+        await replyMsg.edit("⚠️ System Error: Unable to process request.");
     }
 }
 
-// --- Initialization ---
 const fortuneQueue = new AsyncQueue(handleFortuneRequest);
 
-// --- Interface Functions ---
-
-function enqueueRequest(message) {
-    console.log(`[Fortune] Added to queue. Size: ${fortuneQueue.getSize() + 1}`);
-    return fortuneQueue.enqueue(message);
-}
-
-/**
- * Manually trigger the queue processing.
- * Note: In the new system, enqueue() calls this automatically, 
- * but we keep this exported for backward compatibility with your bot.js
- */
-function processQueue() {
-    return fortuneQueue.process();
-}
-
-function getIsProcessingQueue() {
-    return fortuneQueue.getIsProcessing();
-}
-
-function getQueueSize() {
-    return fortuneQueue.getSize();
-}
-
-// Export everything including processQueue
 module.exports = {
-    enqueueRequest,
-    processQueue,
-    getIsProcessingQueue,
-    getQueueSize,
+    enqueueRequest: (msg) => fortuneQueue.enqueue(msg),
+    processQueue: () => fortuneQueue.process(),
+    getIsProcessingQueue: () => fortuneQueue.getIsProcessing(),
+    getQueueSize: () => fortuneQueue.getSize(),
 };
