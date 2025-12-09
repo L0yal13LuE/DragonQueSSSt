@@ -29,17 +29,17 @@ async function handleFortuneRequest(message) {
 
             // TYPE 1 : EXA FIRST
             // Priority 1
-            // let mcpContext = await TOOL_EXA.callAPI(responseToolUse);
-            // console.log("[EXA]", mcpContext !== '');
+            let mcpContext = await TOOL_EXA.callAPI(responseToolUse);
+            console.log("[EXA]", mcpContext !== '');
 
-            // // Priority 2 Only trigger google if EXA MCP fail
-            // if (mcpContext == "") {
-            //     const googleContext = await TOOL_SEARCH_GOOGLE.callAPI(message.guild.id, responseToolUse);
-            //     console.log("[Google]", googleContext !== '');
-            //     mcpContext = googleContext;
-            // }
+            // Priority 2 Only trigger google if EXA MCP fail
+            if (mcpContext == "") {
+                const googleContext = await TOOL_SEARCH_GOOGLE.callAPI(message.guild.id, responseToolUse);
+                console.log("[Google]", googleContext !== '');
+                mcpContext = googleContext;
+            }
 
-            // TYPE 2 : GOOGLE FIRST
+            /*// TYPE 2 : GOOGLE FIRST
             // Priority 1
             let mcpContext = await TOOL_SEARCH_GOOGLE.callAPI(message.guild.id, responseToolUse);
             console.log("[Google]", mcpContext !== '');
@@ -49,7 +49,7 @@ async function handleFortuneRequest(message) {
                 const exaContext = await TOOL_EXA.callAPI(responseToolUse);
                 console.log("[EXA]", exaContext !== '');
                 mcpContext = exaContext;
-            }
+            }*/
 
             await thinkingMessage.edit("🤭 กำลังจะมาแล้ว รออีกนิ๊สสส...");
             const responseAiResult = await AGENT_B.callAPI(mcpContext, userContxt);

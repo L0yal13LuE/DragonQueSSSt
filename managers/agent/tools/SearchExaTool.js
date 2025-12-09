@@ -152,13 +152,11 @@ async function _callByDate(maxResult, userQuery, dateParams) {
                     "startPublishedDate": start_date,
                     "endPublishedDate": end_date,
                     "type": "auto",
-                    // "userLocation": "TH",
                     "moderation": true,
                     "contents": {
                         "summary": {
-                            "query": "# Task\nSummary the context without other properties\n\n# Output Format\n{short to middle summary or key take away}\n\n# Rules (Must follow)\n- Use English only. If the source language is not an English then translate it.\n- Use only plain text format no bold, markdown just pure text with simple lines breaking.\n"
+                            "query": "# Task\n- Summary the context without other properties\n- Translate the summary If not English\n- Proceed with restrict rules\n\n# Output Format\n{ short to middle summary or key takeaway (must maintain the core important information) }\n\n# Rules (Must follow)\n- Straight to the point without explaining  the website business or what they do.\n- Use English with nutral languange explanation as much as possible. \n- IF source is not English language, must translate the source to English with nutral tone explantion according to source language, becareful to not over-doing this.\n- Use only plain text format no bold, markdown just pure text with simple lines breaking."
                         },
-                        //"context": true
                     }
                 }
             ),
