@@ -71,7 +71,7 @@ const {
   handleCraftListInteraction,
   handleCraftListButtonClick,
 } = require("./managers/craftPaginationManager.js");
-const chatBot = require('./managers/chatBot.js'); 
+// const chatBot = require('./managers/chatBot.js');
 const {
   handlePetCommand
 } = require("./managers/petManager.js");
@@ -242,8 +242,7 @@ client.once("clientReady", async () => {
         CONSTANTS.HOURLY_CHECK_INTERVAL
       );
       console.log(
-        `Hourly monster check scheduled every ${
-          CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)
+        `Hourly monster check scheduled every ${CONSTANTS.HOURLY_CHECK_INTERVAL / (60 * 1000)
         } minutes.`
       );
     } catch (error) {
@@ -257,9 +256,9 @@ client.once("clientReady", async () => {
 
   // Spawn clan shop from s1-s24
   const clanNumbers = [
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-      22, 23, 24,
-    ],
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+    22, 23, 24,
+  ],
     clanNumbersInitial = [];
   await Promise.all(
     clanNumbers.map(async (clanNumber) => {
@@ -388,20 +387,32 @@ client.on("messageCreate", async (message) => {
   else {
     // --- ADD BOT MENTION CHECK HERE ---
     // Check if the bot user was specifically mentioned (not @everyone or a role)
-    if (message.mentions.has(client.user) && !message.mentions.everyone) {
-      // Enqueue the request
-      // This automatically triggers the process if the queue was empty
-      const currentQueueSize = chatBot.enqueueRequest(message);
-      console.log(`[Fortune] Added request from ${message.author.tag} to the queue. Queue length: ${currentQueueSize}`);
-
-      // LOGIC:
-      // If Size > 1: The bot is busy with someone else. Tell user to wait.
-      // If Size == 1: The bot starts immediately. 
-      if (currentQueueSize > 1) {
-          await message.reply("รอสักครู่... ตอบแน่แต่ช้าหน่อย 🫠");
-      } 
-    }
+    // if (message.mentions.has(client.user) && !message.mentions.everyone) {
+    //   // Enqueue the request
+    //   // This automatically triggers the process if the queue was empty
+    //   const currentQueueSize = chatBot.enqueueRequest(message);
+    //   console.log(`[Fortune] Added request from ${message.author.tag} to the queue. Queue length: ${currentQueueSize}`);
+    //   // LOGIC:
+    //   // If Size > 1: The bot is busy with someone else. Tell user to wait.
+    //   // If Size == 1: The bot starts immediately. 
+    //   if (currentQueueSize > 1) {
+    //       await message.reply("รอสักครู่... ตอบแน่แต่ช้าหน่อย 🫠");
+    //   } 
+    // }
     // --- END BOT MENTION CHECK ---
+
+    // Normal moew reply
+    if (message.mentions.has(client.user) && !message.mentions.everyone) {
+      const randomIndex = Math.floor(Math.random() * CONSTANTS.catReplies.length);
+      const replyText = CONSTANTS.catReplies[randomIndex];
+      try {
+        await message.reply(replyText);
+        // console.log(`[${message.author.username}] Mentioned the bot. Replied with: ${replyText}`);
+      } catch (error) {
+        console.error("Error sending cat reply:", error);
+      }
+      return;
+    }
 
     // Pass necessary dependencies and the state reference object
     await gameLogic.handleExpGain(
