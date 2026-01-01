@@ -31,7 +31,7 @@ const CONFIG = {
     RATE_LIMIT_CLEANUP_INTERVAL: 60 * 60 * 1000, // 1 hour
     API_TIMEOUT: (60 * 5) * 1000, // 5 minutes
     OUTPUT_DIR: 'image-output',
-    // NEW: Cooldown buffer between processing queue items
+    // Cooldown buffer between processing queue items
     PROCESS_COOLDOWN: 30 * 1000, // 15 seconds
 };
 const PYTHON_CMD = process.env.CMD_PYTHON || "python";
@@ -145,10 +145,44 @@ class Queue {
 // --- GIF Processing Queue ---
 const requestQueue = new Queue();
 let isProcessingQueue = false;
-// NEW: Track the currently processing item to inform users.
+
+// Track the currently processing item to inform users.
 let currentlyProcessing = null;
-// NEW: Analytics
+
+// Analytics
 const processingTimes = []; // To store completion times in ms
+
+let shouldUseLocal = false;
+
+// Track active python processes for cleanup if needed
+const activePythonProcesses = new Set();
+
+async function checkOnline() {
+    try {
+        const res = await fetch(`https://api.render.com/v1/services/${CONFIG.RENDER_SERVICE_ID}`, {
+            method: "GET",
+            headers: {
+                "authorization": `Bearer ${CONFIG.RENDER_API_KEY}`,
+                "accept": "application/json"
+            },
+        });
+        const isSuspended = await res.json().then((data) => {
+            if (data.suspended === 'suspended') {
+                return true;
+            }
+            return false;
+        });
+        shouldUseLocal = isSuspended;
+        console.log('[GIF] Check Ofline : ', shouldUseLocal);
+        if (isSuspended) {
+            console.log('[GIF] Check Ofline : ', shouldUseLocal, ' > Fallback local python code instead.');
+        }
+        return (!res.ok || isSuspended) ? false : true;
+    } catch (error) {
+        console.error("checkOnline api error:", error);
+        return false;
+    }
+}
 
 async function useOnlineAPI(url, startTime, endTime, outputFile) {
     if (!CONFIG.PYTHON_API_URL) {
@@ -180,65 +214,6 @@ async function useOnlineAPI(url, startTime, endTime, outputFile) {
         clearTimeout(timeoutId);
     }
 }
-
-async function useLocalAPI(url, startTime, endTime, outputFile) {
-    // use local python api server
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), CONFIG.API_TIMEOUT);
-    try {
-        console.log(`[GIF] API : url=${url} | start_time=${startTime} | end_time=${endTime}`)
-        const res = await fetch(`http://127.0.0.1:5000/convert`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url, start_time: startTime, end_time: endTime }),
-            signal: controller.signal
-        });
-        if (!res.ok) {
-            const errorText = await res.text().catch(() => `Status code: ${res.status}`);
-            throw new Error(`Python API failed: ${errorText}`);
-        }
-        const buffer = Buffer.from(await res.arrayBuffer());
-        await fs.promises.writeFile(outputFile, buffer);
-        return outputFile;
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            throw new Error(`Python API request timed out after ${CONFIG.API_TIMEOUT / 1000} seconds.`);
-        }
-        throw error;
-    } finally {
-        clearTimeout(timeoutId);
-    }
-}
-
-let shouldUseLocal = false;
-async function checkOnline() {
-    try {
-        const res = await fetch(`https://api.render.com/v1/services/${CONFIG.RENDER_SERVICE_ID}`, {
-            method: "GET",
-            headers: {
-                "authorization": `Bearer ${CONFIG.RENDER_API_KEY}`,
-                "accept": "application/json"
-            },
-        });
-        const isSuspended = await res.json().then((data) => {
-            if (data.suspended === 'suspended') {
-                return true;
-            }
-            return false;
-        });
-        shouldUseLocal = isSuspended;
-        console.log('[GIF] Check Ofline : ', shouldUseLocal);
-        if (isSuspended) {
-            console.log('[GIF] Check Ofline : ', shouldUseLocal, ' > Fallback local python code instead.');
-        }
-        return (!res.ok || isSuspended) ? false : true;
-    } catch (error) {
-        console.error("checkOnline api error:", error);
-        return false;
-    }
-}
-
-const activePythonProcesses = new Set();
 
 function useLocalPython(url, startTime, endTime, outputFile) {
     return new Promise((resolve, reject) => {
@@ -297,8 +272,37 @@ function useLocalPython(url, startTime, endTime, outputFile) {
     });
 }
 
+async function useLocalAPI(url, startTime, endTime, outputFile) {
+    // use local python api server
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CONFIG.API_TIMEOUT);
+    try {
+        console.log(`[GIF] API : url=${url} | start_time=${startTime} | end_time=${endTime}`)
+        const res = await fetch(`http://127.0.0.1:5000/convert`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url, start_time: startTime, end_time: endTime }),
+            signal: controller.signal
+        });
+        if (!res.ok) {
+            const errorText = await res.text().catch(() => `Status code: ${res.status}`);
+            throw new Error(`Python API failed: ${errorText}`);
+        }
+        const buffer = Buffer.from(await res.arrayBuffer());
+        await fs.promises.writeFile(outputFile, buffer);
+        return outputFile;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error(`Python API request timed out after ${CONFIG.API_TIMEOUT / 1000} seconds.`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
 
-// MODIFIED: This function now just adds data to the queue and starts the processor if it's idle.
+
+// This function now just adds data to the queue and starts the processor if it's idle.
 function enqueueGifRequest(message, url, startTime, endTime) {
     const request = {
         author: message.author, // The full author object for tagging later
@@ -319,13 +323,10 @@ function enqueueGifRequest(message, url, startTime, endTime) {
 }
 
 /**
- * MODIFIED: This function is now a self-perpetuating background processor.
+ * This function is now a self-perpetuating background processor.
  * It processes one item, waits for a cooldown, then calls itself to process the next.
  */
 async function processGifQueue() {
-    // ping online api to check status
-    // await checkOnline();
-
     if (requestQueue.isEmpty()) {
         console.log(`[QUEUE] No queue, standing by for the next commands.`);
         isProcessingQueue = false;
@@ -336,7 +337,7 @@ async function processGifQueue() {
     isProcessingQueue = true;
     const job = requestQueue.dequeue();
     const processingStartTime = Date.now();
-    currentlyProcessing = job; // NEW: Set the current job for status messages
+    currentlyProcessing = job; // Set the current job for status messages
     const { author, channelId, url, startTime, endTime } = job;
 
     console.log(`[QUEUE] Processing request for ${author.tag}. Queue size: ${requestQueue.size}`);
@@ -345,7 +346,7 @@ async function processGifQueue() {
     let channel;
 
     try {
-        // NEW: We must fetch the channel object as we no longer have the original message context.
+        // We must fetch the channel object as we no longer have the original message context.
         channel = await client.channels.fetch(channelId);
         if (!channel) {
             throw new Error(`Could not find channel with ID ${channelId}`);
@@ -355,15 +356,11 @@ async function processGifQueue() {
 
         console.log(`[GIF] Started processing ${url} for ${author.tag}.`);
 
-        // const imageOutputFile = !shouldUseLocal
-        //     ? await useOnlineAPI(url, startTime, endTime, outputFile)
-        //     : await useLocalPython(url, startTime, endTime, outputFile);
-
         const imageOutputFile = await useLocalAPI(url, startTime, endTime, outputFile);
-
         const attachment = new AttachmentBuilder(imageOutputFile);
+        const successMessage = `${author.toString()} 👇`;
         await channel.send({
-            content: `😉 อ่ะนี่! ${author.toString()} พอใจแล้วใช่ไหมล่ะ! ขอโทษที่ทำให้เธอรอนานนะ ❤️`,
+            content: successMessage,
             files: [attachment]
         });
         console.log(`[GIF] Successfully finished request for ${author.tag}.`);
@@ -382,7 +379,8 @@ async function processGifQueue() {
         try {
             // If we fetched the channel, try to send the error message there.
             if (channel) {
-                await channel.send({ content: `${author.toString()}, 😭 แง๊ๆมัน Error ง่ะ ตามนี้เลย เดี๋ยวให้ dev มาดูเองละกัน 😔 : ${errorMessage}` });
+                const fullErrorMessage = truncateMessage(`${author.toString()}, 😭 Error ง่ะ ตามนี้เลย เดี๋ยวให้ dev มาดูเองละกัน 😔 : ${errorMessage}`);
+                await channel.send({ content: fullErrorMessage });
             }
         } catch (replyError) {
             console.error("[ERROR] Failed to send error message to user:", replyError);
@@ -400,7 +398,7 @@ async function processGifQueue() {
             }
         }
 
-        // NEW: Analytics Calculation
+        // Analytics Calculation
         const processingTime = Date.now() - processingStartTime;
         processingTimes.push(processingTime);
 
@@ -411,7 +409,7 @@ async function processGifQueue() {
             console.log(`[ANALYTICS] Job for ${author.tag} finished in ${(processingTime / 1000).toFixed(2)}s. Average processing time: ${(averageProcessingTime / 1000).toFixed(2)}s over ${processingTimes.length} jobs.`);
         }
 
-        // NEW: Cooldown buffer logic.
+        // Cooldown buffer logic.
         console.log(`[QUEUE] Finished job. Waiting for ${CONFIG.PROCESS_COOLDOWN / 1000}s cooldown.`);
         currentlyProcessing = null; // Clear current job before cooldown
 
@@ -430,6 +428,13 @@ function generateOutputFilename() {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const randomSuffix = Math.random().toString(36).substring(2, 8);
     return path.join(CONFIG.OUTPUT_DIR, `${timestamp}-${randomSuffix}.webp`);
+}
+
+function truncateMessage(message, maxLength = 1000) {
+    if (message.length <= maxLength) {
+        return message;
+    }
+    return message.substring(0, maxLength - 3) + '...';
 }
 
 function parseTime(input) {
@@ -459,7 +464,7 @@ function parseTime(input) {
 client.once("clientReady", async () => {
     console.log(`[INFO] Logged in as ${client.user.tag}! Bot is ready.`);
     // setInterval(cleanupRateLimitMaps, CONFIG.RATE_LIMIT_CLEANUP_INTERVAL);
-    // NEW: Kick off the queue processor once the bot is ready.
+    // Kick off the queue processor once the bot is ready.
     processGifQueue();
 });
 
@@ -476,7 +481,7 @@ client.on("messageCreate", async (message) => {
             "\n**Example (entire video):**\n`!gif https://x.com/user/status/123456789`\n" +
             "\n**Example (from 5s to 10s):**\n`!gif https://x.com/user/status/123456789 00:05 00:10`\n" +
             "\n**Note**:\n" +
-            "- Bot can process up to **5 seconds** of gif (of your selected time frame), Do not use long clip it may cause bot timed out.\n" +
+            "- Bot can process up to **5-10 seconds** of gif (of your selected time frame), Do not use long clip it may cause bot timed out.\n" +
             "- Bot will tagging you once your reqeuest is done.\n" +
             "- Rate limits may apply based on server load.";
 
@@ -489,13 +494,27 @@ client.on("messageCreate", async (message) => {
         const match = message.content.match(enhancedRegex);
 
         if (match) {
-            const url = match[1].trim();
+            let url = match[1].trim();
+
+            // clean up url domains proxy
+            const domainsToReplace = [
+                'fxtwitter.com',
+                'twittpr.com',
+                'fixupx.com',
+                'xfixup.com',
+            ];
+            for (const domain of domainsToReplace) {
+                // Regex to match the protocol, optional subdomains, and the main domain, preserving the protocol in group $1
+                const regex = new RegExp(`(https?:\/\/)(?:[a-z0-9-]+\.)*${domain.replace('.', '\\.')}`, 'i');
+                url = url.replace(regex, '$1x.com');
+            }
+
             const timeStart = parseTime(match[2]) || '00:00';
             const timeEnd = parseTime(match[3]) || '00:00';
 
             //  Enqueue the request and immediately reply to the user.
             const queuePosition = enqueueGifRequest(message, url, timeStart, timeEnd);
-            let responseMessage = `✅ ได้รับคำขอแล้วจ้า! ถ้าเสร็จแล้วจะแท็กไปนะ`;
+            let responseMessage = `👌 OK รอแป๊บจ้า`;
             if (currentlyProcessing) {
                 // Use <URL> to prevent Discord from creating a large embed for the URL
                 // responseMessage += `\nซึ่งตอนนี้เรากำลังทำไฟล์ของ <${currentlyProcessing.url}> ของ **${currentlyProcessing.author.username}** อยู่น่ะ`;
