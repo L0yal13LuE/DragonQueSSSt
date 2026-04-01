@@ -486,8 +486,8 @@ client.on("messageCreate", async (message) => {
 			return;
 		}
 		
-		const startTime = parseTime(match[2]) || '00:00';
-		const endTime = parseTime(match[3]) || '00:00';
+		const startTime = parseTime(gifCommandMatch[2]) || '00:00';
+		const endTime = parseTime(gifCommandMatch[3]) || '00:00';
 		const queueSize = enqueueGifRequest(message, url, startTime, endTime);
 		if (queueSize >= 1 && getIsGifProcessing()) {
 			await message.reply({
