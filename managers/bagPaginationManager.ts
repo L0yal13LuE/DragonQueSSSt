@@ -1,0 +1,296 @@
+import {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags,
+} from 'discord.js';
+import { getUserItem } from '../providers/materialProvider';
+
+const BAG_ITEMS_PER_PAGE = 10;
+const BAG_AUTO_CLOSE_MINUTES = 2;
+const BAG_INTERACTION_COOLDOWN_SECONDS = 4;
+
+interface BagInstance {
+  message: any;
+  timeoutId: any;
+  userItems: any[];
+  currentPage: number;
+}
+
+const activeBagInstances: Map<string, BagInstance> = new Map();
+
+const bagInteractionCooldowns: Map<string, number> = new Map();
+
+const createBagPageEmbed = (
+  username: string,
+  userItems: any[],
+  page: number,
+  totalPages: number,
+  expirationTimestamp: string
+): EmbedBuilder => {
+  const start = page * BAG_ITEMS_PER_PAGE;
+  const end = start + BAG_ITEMS_PER_PAGE;
+  const itemsToShow = userItems.slice(start, end);
+
+  const itemListText = itemsToShow.length > 0
+    ? itemsToShow.map((item: any) => `${item.material.rarities.emoji} ${item.material.name} ${item.material.emoji} x ${item.amount.toLocaleString()}`).join('\n')
+    : 'Your bag is empty!';
+
+  return new EmbedBuilder()
+    .setColor(0x0099FF)
+    .setTitle(`${username}'s Bag`)
+    .setDescription(`${itemListText}\n\nThis bag view will close ${expirationTimestamp}.`)
+    .setFooter({ text: `Page ${page + 1} of ${totalPages}` });
+};
+
+const createBagPaginationButtons = (
+  messageId: string,
+  userId: string,
+  currentPage: number,
+  totalPages: number
+): ActionRowBuilder<ButtonBuilder> => {
+  return new ActionRowBuilder<ButtonBuilder>()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId(`bag_nav_${messageId}_first`)
+        .setLabel('<< First')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(currentPage === 0 || totalPages <= 1),
+      new ButtonBuilder()
+        .setCustomId(`bag_nav_${messageId}_prev`)
+        .setLabel('< Prev')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(currentPage === 0 || totalPages <= 1),
+      new ButtonBuilder()
+        .setCustomId(`bag_nav_${messageId}_next`)
+        .setLabel('Next >')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(currentPage >= totalPages - 1 || totalPages <= 1),
+      new ButtonBuilder()
+        .setCustomId(`bag_nav_${messageId}_last`)
+        .setLabel('Last >>')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(currentPage >= totalPages - 1 || totalPages <= 1)
+    );
+};
+
+const handleBagCommand = async (message: any, isDM = false): Promise<void> => {
+  const userId = message.author.id;
+  const username = message.author.username;
+  const autoCloseMs = BAG_AUTO_CLOSE_MINUTES * 60 * 1000;
+
+  try {
+    const userItems = await getUserItem({ userId: userId, amount: 1 });
+
+    if (!userItems || userItems.length === 0) {
+      const emptyBagMessage = 'Your bag is empty... Go find some items!';
+      if (isDM) {
+        try {
+          const dmEmbed = new EmbedBuilder().setTitle(`${username}'s Bag`).setDescription(emptyBagMessage).setColor(0x0099FF);
+          await message.author.send({ embeds: [dmEmbed] });
+          if (message.channel.type !== 'DM') {
+            await message.reply({ content: `✅ I've sent your (empty) bag contents to your DMs!` });
+          }
+        } catch (error) {
+          if (message.channel.type !== 'DM') {
+            await message.reply({ content: `❌ I couldn't DM you. Please check your settings to allow direct messages from server members.` });
+          } else {
+            console.warn(`Could not send DM to ${userId} for empty bag, already in DMs.`);
+          }
+        }
+      } else {
+        await message.reply({ content: emptyBagMessage });
+      }
+      return;
+    }
+
+    if (isDM) {
+      const itemList = userItems
+        .map((value: any) => `${value.material.emoji} ${value.material.name}: ${value.amount.toLocaleString()}`)
+        .join('\n');
+      const dmEmbed = new EmbedBuilder().setTitle(`${username}'s Bag`).setDescription(itemList).setColor(0x0099FF);
+      try {
+        await message.author.send({ embeds: [dmEmbed] });
+        if (message.channel.type !== 'DM') {
+          await message.reply({ content: `✅ I've sent your bag contents to your DMs!` });
+        }
+      } catch (error) {
+        if (message.channel.type !== 'DM') {
+          await message.reply({ content: `❌ I couldn't DM you. Please check your settings to allow direct messages from server members.` });
+        } else {
+          console.warn(`Could not send DM to ${userId} for bag with items, already in DMs.`);
+        }
+      }
+      return;
+    }
+
+    if (activeBagInstances.has(userId)) {
+      const oldInstance = activeBagInstances.get(userId)!;
+      clearTimeout(oldInstance.timeoutId);
+      oldInstance.message.delete().catch((e: any) => console.warn("Couldn't delete previous bag message:", e.message));
+      activeBagInstances.delete(userId);
+    }
+
+    const expirationTimestamp = `<t:${Math.floor((Date.now() + autoCloseMs) / 1000)}:R>`;
+    let currentPage = 0;
+    const totalPages = Math.ceil(userItems.length / BAG_ITEMS_PER_PAGE);
+
+    const initialEmbed = createBagPageEmbed(username, userItems, currentPage, totalPages, expirationTimestamp);
+    const tempMessageIdMarker = `temp_${Date.now()}`;
+    const initialComponents = totalPages > 1
+      ? [createBagPaginationButtons(tempMessageIdMarker, userId, currentPage, totalPages)]
+      : [];
+
+    const replyMessage = await message.reply({
+      embeds: [initialEmbed],
+      components: initialComponents,
+      fetchReply: true,
+    });
+
+    if (totalPages > 1) {
+      const finalComponents = [createBagPaginationButtons(replyMessage.id, userId, currentPage, totalPages)];
+      await replyMessage.edit({ components: finalComponents }).catch((e: any) => console.warn('Failed to edit bag message with final components:', e.message));
+    }
+
+    const timeoutId = setTimeout(async () => {
+      const currentInstance = activeBagInstances.get(userId);
+      if (currentInstance && currentInstance.message.id === replyMessage.id) {
+        try {
+          await replyMessage.edit({ content: '**Bag view closed.** Use `!bagnew` to open again.', embeds: [], components: [] });
+        } catch (errorDel) {
+          console.warn('Error editing bag message on timeout:', (errorDel as Error).message);
+        }
+        activeBagInstances.delete(userId);
+        bagInteractionCooldowns.delete(userId);
+      }
+    }, autoCloseMs);
+
+    activeBagInstances.set(userId, {
+      message: replyMessage,
+      timeoutId: timeoutId,
+      userItems: userItems,
+      currentPage: currentPage,
+    });
+  } catch (error) {
+    console.error(`Error handling bag command for ${username} (ID: ${userId}):`, error);
+    await message.reply({ content: "Sorry, I couldn't display your bag right now. Please try again." }).catch(() => {});
+  }
+};
+
+const handleBagPaginationInteraction = async (interaction: any): Promise<void> => {
+  if (!interaction.isButton() || !interaction.customId.startsWith('bag_nav_')) {
+    return;
+  }
+
+  try {
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.deferUpdate();
+    }
+  } catch (deferError) {
+    console.error(`Error deferring donation list pagination update: ${(deferError as Error).message}`);
+    return;
+  }
+
+  const userId = interaction.user.id;
+
+  const now = Date.now();
+  const userCooldownEndTimestamp = bagInteractionCooldowns.get(userId);
+
+  if (userCooldownEndTimestamp && now < userCooldownEndTimestamp) {
+    const timeLeft = Math.ceil((userCooldownEndTimestamp - now) / 1000);
+    try {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: `You're navigating too quickly! Please wait ${timeLeft} more second(s).`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    } catch (e) {
+      console.warn(`Cooldown ephemeral reply failed : ${(e as Error).message}`);
+    }
+    return;
+  }
+  bagInteractionCooldowns.set(userId, now + (BAG_INTERACTION_COOLDOWN_SECONDS * 1000));
+
+  const parts = interaction.customId.split('_');
+  if (parts.length < 4) {
+    console.warn(`Malformed bag_nav customId : ${interaction.customId}`);
+    return;
+  }
+  const messageIdFromCustomId = parts[2];
+  const action = parts[3];
+
+  const bagInstance = activeBagInstances.get(userId);
+
+  const msgId_A = interaction.message.id.toString();
+  const msgId_1 = messageIdFromCustomId?.toString() ?? null;
+  const msgId_2 = bagInstance?.message?.id?.toString() ?? null;
+  if (msgId_A !== msgId_1 || msgId_A !== msgId_2) {
+    try {
+      if (interaction.deferred) {
+        console.warn(`Warning User ${userId} trying to use other's interaction (1): ${interaction.customId}`);
+        return await interaction.followUp({
+          content: 'Please use your own command.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      return;
+    } catch (e) {
+      console.warn(`[BagPaginationManager] Expired view followUp failed (1): ${(e as Error).message}`);
+    }
+    return;
+  }
+
+  if (!bagInstance || bagInstance === null) {
+    try {
+      if (interaction.deferred) {
+        console.warn(`Warning User ${userId} trying to use other's interaction (2): ${interaction.customId}`);
+        return await interaction.followUp({
+          content: 'Session expired or not your command.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      return;
+    } catch (e) {
+      console.warn(`[BagPaginationManager] Expired view followUp failed (2): ${(e as Error).message}`);
+    }
+    return;
+  }
+
+  const { userItems } = bagInstance;
+  let currentPage = bagInstance.currentPage;
+  const totalPages = Math.ceil(userItems.length / BAG_ITEMS_PER_PAGE);
+  const autoCloseMs = BAG_AUTO_CLOSE_MINUTES * 60 * 1000;
+  const expirationTimestamp = `<t:${Math.floor((bagInstance.message.createdTimestamp + autoCloseMs) / 1000)}:R>`;
+
+  let newPage = currentPage;
+  if (action === 'first') newPage = 0;
+  else if (action === 'prev') newPage = Math.max(0, currentPage - 1);
+  else if (action === 'next') newPage = Math.min(totalPages - 1, currentPage + 1);
+  else if (action === 'last') newPage = totalPages - 1;
+
+  if (newPage === currentPage) {
+    return;
+  }
+
+  bagInstance.currentPage = newPage;
+  currentPage = newPage;
+
+  try {
+    const updatedEmbed = createBagPageEmbed(interaction.user.username, userItems, currentPage, totalPages, expirationTimestamp);
+    const updatedButtons = createBagPaginationButtons(interaction.message.id, userId, currentPage, totalPages);
+
+    await interaction.editReply({
+      embeds: [updatedEmbed],
+      components: [updatedButtons],
+    });
+  } catch (error) {
+    console.error(`Error on editReply for bag pagination  (page ${currentPage}): ${(error as Error).message}`);
+  }
+};
+
+export {
+  handleBagCommand,
+  handleBagPaginationInteraction,
+};
